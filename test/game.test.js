@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {player,start,tick,action,possess,shuffle,shoot,reload,view,sanitizeSettings,configureRoom,syncBots,setTeam,PREP_MS,ROUND_MS,SHOT_MS,RELOAD_MS,JUMP_SPEED} from '../game.js';
+import {player,start,tick,action,possess,shuffle,shoot,reload,view,sanitizeSettings,configureRoom,syncBots,setTeam,PREP_MS,ROUND_MS,SHOT_MS,RELOAD_MS,JUMP_SPEED,LIFT_MAX} from '../game.js';
 import {free,propTypes,nearestHit,generateProps,zoneAt,zones,surfaceHeight,fixtures} from '../public/world.js';
 function room(size=1,botMode='off'){
  const r={code:'TEST',host:'a',phase:'lobby',settings:sanitizeSettings({teamSize:size,botMode,swapTeams:false}),players:{a:player('a','Avcı',false,'hunter'),b:player('b','Saklanan',false,'hider')}};
@@ -157,7 +157,8 @@ test('size decides what can be climbed and what can be crawled under',()=>{
 
 test('three permanent decoys: authoritative limits, escape clearance, no ownership leak, round reset',()=>{
  const {r,p,o}=scenario();assert.ok(possess(r,p,o.id).ok);
- r.phase='prep';assert.equal(action(r,p,{kind:'decoy'},1000).ok,false);r.phase='play';
+ r.phase='prep';assert.ok(action(r,p,{kind:'decoy'},1000).ok,'kopya av başlamadan da bırakılabilir');
+ assert.equal(p.decoys,2);r.objects=r.objects.filter(q=>!q.decoyOf);p.decoys=3;r.phase='play';
  assert.equal(action(r,r.players.a,{kind:'decoy'},1000).ok,false);
  for(let i=0;i<3;i++)assert.ok(action(r,p,{kind:'decoy'},2000+i).ok);
  assert.equal(p.decoys,0);assert.equal(action(r,p,{kind:'decoy'},2100).ok,false);
@@ -182,4 +183,26 @@ test('decoys cannot be possessed and cannot be placed while airborne or found',(
 test('full soak emits one reveal animation, hidden during hunter preparation',()=>{
  const {r,p,h,o}=scenario('basket',90);assert.ok(possess(r,p,o.id).ok);assert.ok(shoot(r,h,3000));assert.equal(p.status,'found');assert.equal(r.effects.length,1);assert.equal(r.effects[0].kind,'reveal');assert.equal(view(r,h.id,3000).effects.length,1);
  r.phase='prep';assert.equal(view(r,h.id,3000).effects.length,0);
+});
+
+test('a disguise can be raised and lowered, is capped, and settles when let go',()=>{
+ const {r,p,o}=scenario('mug');assert.ok(possess(r,p,o.id).ok);
+ assert.equal(p.y,0);
+ for(let t=20000;t<20600;t+=50){p.input={lift:1};p.inputAt=t;tick(r,t,.05);}
+ assert.ok(p.y>.5,`kaldırma yükseltir (${p.y.toFixed(2)} m)`);
+ assert.equal(o.y,p.y,'nesne oyuncuyla birlikte yükselir');
+ const raised=p.y;
+ for(let t=20600;t<20900;t+=50){p.input={lift:-1};p.inputAt=t;tick(r,t,.05);}
+ assert.ok(p.y<raised,'indirme aşağı çeker');
+ // Tuş bırakılınca yerçekimi devam eder ve nesne yere oturur.
+ for(let t=20900;t<21800;t+=50){p.input={};p.inputAt=t;tick(r,t,.05);}
+ assert.equal(p.y,0,'bırakılınca yerine oturur');
+ // Tavana kadar çıkmaz.
+ for(let t=21800;t<26000;t+=50){p.input={lift:1};p.inputAt=t;tick(r,t,.05);}
+ assert.ok(p.y<=LIFT_MAX+.001,`üst sınır korunur (${p.y.toFixed(2)} m)`);
+ assert.ok(p.y>2,'ama raf yüksekliğine çıkabilir');
+ // Sabitlenmiş kılık yükselmez.
+ const pinned=scenario('mug');assert.ok(possess(pinned.r,pinned.p,pinned.o.id).ok);
+ pinned.p.locked=true;pinned.p.input={lift:1};pinned.p.inputAt=20000;tick(pinned.r,20000,.05);
+ assert.equal(pinned.p.y,0,'F ile sabitlenmişken yükselmez');
 });

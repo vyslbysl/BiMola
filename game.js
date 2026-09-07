@@ -6,7 +6,9 @@ export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPE
 // Hiders can hop onto counters, tables and beds: JUMP_SPEED clears the 1 m kitchen counter with
 // a little room to spare (apex = JUMP_SPEED^2 / 2*GRAVITY ~ 1.21 m). SPIN_SPEED is how fast a
 // disguise can be turned on the spot, in radians per second.
-export const GRAVITY=18,JUMP_SPEED=6.6,SPIN_SPEED=2.4;
+// LIFT_SPEED, kılığı yukarı aşağı taşıma hızı; LIFT_MAX en yüksek rafın (2,6 m) üstüne
+// bırakmaya yetecek kadar, tavana kadar değil.
+export const GRAVITY=18,JUMP_SPEED=6.6,SPIN_SPEED=2.4,LIFT_SPEED=1.4,LIFT_MAX=2.9;
 export const defaultSettings={teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:DEFAULT_PROP_COUNT};
 const teams=['hunter','hider'];
 const integer=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)))):fallback;
@@ -107,7 +109,7 @@ export function shuffle(r,p){
  detachChildren(r.objects,o);delete o.supportId;o.anchored=false;o.type=candidates[Math.floor(Math.random()*candidates.length)];p.changes--;return {ok:true,type:o.type,changes:p.changes};
 }
 export function decoy(r,p,now=Date.now()){
- if(!p||r.phase!=='play'||p.team!=='hider'||p.status!=='alive'||!p.propId)return {ok:false,error:'Kopyayı av başladıktan sonra, bir nesneyken bırakabilirsin.'};
+ if(!p||!['prep','play'].includes(r.phase)||p.team!=='hider'||p.status!=='alive'||!p.propId)return {ok:false,error:'Kopyayı bir nesneyken bırakabilirsin.'};
  if(p.decoys<=0)return {ok:false,error:'Bu turdaki üç kopyanı kullandın.'};
  const source=r.objects.find(o=>o.id===p.propId&&o.owner===p.id);
  if(!source||!p.grounded)return {ok:false,error:'Kopyayı yere bastığında bırak.'};
@@ -225,13 +227,25 @@ export function tick(r,now,dt){
   }
   const spin=Math.max(-1,Math.min(1,Number(p.input.spin)||0));
   if(o&&spin){const turns=Math.max(1,Math.ceil(Math.abs(spin*SPIN_SPEED*dt)/.035));for(let i=0;i<turns;i++)if(!attempt(p.x,p.z,p.y,(o.angle||0)+spin*SPIN_SPEED*dt/turns))break;}
+  // Kılığı yukarı aşağı taşımak: oyuncu ayarladığı sürece yerçekimi beklemede, böylece kupa
+  // rafın üstüne kaldırılıp orada bırakılabilir. Tuş bırakılınca nesne desteğine oturur.
+  // Kaldırmaya başlamak, halı gibi yerine sabitlenmiş bir kılığı da serbest bırakır.
+  const lift=Math.max(-1,Math.min(1,Number(p.input.lift)||0));
+  if(o&&lift&&!p.locked&&p.team==='hider'){o.anchored=false;delete o.supportId;}
   if(p.team==='hider'&&!o?.anchored){
    const parent=r.objects.find(q=>q.id===o?.supportId);
    const ground=parent?(parent.y||0)+(propTypes[parent.type].surface??propTypes[parent.type].height):surfaceHeight(p.x,p.z,Math.max(STAND_MAX_HEIGHT,p.y+.08),r.objects,p.propId);
-   if(p.input.jump&&p.grounded&&!p.locked){p.vy=JUMP_SPEED;if(o)delete o.supportId;}
-   p.vy-=GRAVITY*dt;const ny=Math.max(ground,p.y+p.vy*dt);
-   if(o){if(!attempt(p.x,p.z,ny))p.vy=0;}else p.y=ny;
-   if(p.y<=ground+.005){p.vy=0;p.grounded=true;}else p.grounded=false;
+   if(o&&lift&&!p.locked){
+    const target=Math.max(ground,Math.min(LIFT_MAX,p.y+lift*LIFT_SPEED*dt));
+    const delta=target-p.y,steps=Math.max(1,Math.ceil(Math.abs(delta)/.06)),inc=delta/steps;
+    for(let i=0;i<steps;i++){if(!attempt(p.x,p.z,p.y+inc))break;delete o.supportId;o.anchored=false;}
+    p.vy=0;p.grounded=p.y<=ground+.005;
+   }else{
+    if(p.input.jump&&p.grounded&&!p.locked){p.vy=JUMP_SPEED;if(o)delete o.supportId;}
+    p.vy-=GRAVITY*dt;const ny=Math.max(ground,p.y+p.vy*dt);
+    if(o){if(!attempt(p.x,p.z,ny))p.vy=0;}else p.y=ny;
+    if(p.y<=ground+.005){p.vy=0;p.grounded=true;}else p.grounded=false;
+   }
   }
   if(o){o.x=p.x;o.y=p.y;o.z=p.z;}
   if(p.team==='hunter'&&p.input.fire)shoot(r,p,now);

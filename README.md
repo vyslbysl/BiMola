@@ -40,8 +40,9 @@ Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm,
 | Fare | Bakış ve kamera (tur boyunca fare imleci oyuna kilitlenir) |
 | E | İlk nesneyi seç (3D önizlemeli panel) |
 | Q | Odaya uygun rastgele nesneye değiş (3 hak) |
-| C | Sahte kopya bırak (turda 3 hak, isabet alana kadar kalır) |
+| C | Sahte kopya bırak (saklanma süresinde de olur, turda 3 hak, isabet alana kadar kalır) |
 | Z / X | Nesnenin yönünü çevir |
+| Fare tekerleği / PgUp · PgDn | Kılığı yükselt · indir (rafa kaldırıp bırakabilirsin) |
 | Boşluk (saklanan) | Zıpla — tezgaha, masaya, yatağa çık |
 | F | Konumu sabitle / serbest bırak |
 | Sol tık / Boşluk (avcı) | Su sık |
@@ -74,7 +75,7 @@ Oda ve tur durumu bellektedir, sunucu yeniden başlayınca silinir. Hesap/kalıc
 
 Doğudaki eski giriş/vitrin odası artık oturma alanı, okuma sehpası, bank ve bitki bakım tezgâhıyla kış bahçesidir. Sabit mobilyaların çarpışma alanları sunucuyla ortaktır; rastgele eşyalar oda temasına göre üretilir.
 
-Saklananlar av başladıktan sonra bir nesneyken ve yere basarken C veya ekrandaki Sahte kopya düğmesiyle bulundukları yerde aynı görünümde bir kopya bırakabilir. Turda üç hak vardır; Q dönüşüm haklarından bağımsızdır. Kopyalar zaman aşımına uğramaz. Tek su isabetinde parçacık animasyonuyla kaybolur; asıl oyuncunun su miktarını değiştirmez. Kopyaya dönüşülemez, yeni tur tüm kopyaları temizler.
+Saklananlar bir nesneyken ve yere basarken C veya ekrandaki Sahte kopya düğmesiyle bulundukları yerde aynı görünümde bir kopya bırakabilir; bu saklanma süresinde de yapılabilir, avın başlamasını beklemek gerekmez. Turda üç hak vardır; Q dönüşüm haklarından bağımsızdır. Kopyalar zaman aşımına uğramaz. Tek su isabetinde parçacık animasyonuyla kaybolur; asıl oyuncunun su miktarını değiştirmez. Kopyaya dönüşülemez, yeni tur tüm kopyaları temizler.
 
 %100 ıslanan oyuncuda su halkası, yükselen siluet ve damla animasyonu oynar. Ses başlangıçta kapalıdır; bütün kurallar ve geri bildirimler görseldir. İstenirse menüden ses açılabilir.
 
