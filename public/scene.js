@@ -219,7 +219,7 @@ for(const [x,z,w,d] of walls){if(x===14){box(.3,.58,36,14,.29,0);box(.3,.3,36,14
  function clearEffect(fx){scene.remove(fx.g);fx.material.dispose();fx.silhouette?.children.forEach(o=>o.geometry.dispose());}
  function animateEffects(now){for(let i=revealEffects.length-1;i>=0;i--){const fx=revealEffects[i],age=(now-fx.start)/1000;if(age>=1.5){clearEffect(fx);revealEffects.splice(i,1);continue;}const k=age/1.5;fx.material.opacity=.9*(1-k);fx.ring.scale.setScalar(1+age*(reducedMotion?.5:2.2));for(const piece of fx.pieces){piece.position.copy(piece.userData.start).addScaledVector(piece.userData.velocity,reducedMotion?age*.15:age);piece.position.y=Math.max(.05,piece.position.y-age*age*1.8);piece.rotation.set(age*3,age*2,age);piece.scale.multiplyScalar(.994);}if(fx.silhouette){fx.silhouette.position.y=age*.25;fx.silhouette.scale.setScalar(1+Math.sin(Math.min(1,age*3)*Math.PI)*.12);}}}
  function sync(state,myId){currentState=state;currentId=myId;if(!state)return;for(const effect of state.effects||[])addEffect(effect,state.now-effect.at);updateObjects(state.objects||initialProps);const visibleIds=new Set();for(const p of state.players||[]){const team=p.role||p.team;if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||p.status==='found'||p.propId)continue;visibleIds.add(p.id);let g=people.get(p.id);if(g&&g.userData.team!==team){scene.remove(g);people.delete(p.id);g=null;}if(!g){g=avatar(team);g.position.set(p.x,p.y||0,p.z);people.set(p.id,g);}g.userData.target=new THREE.Vector3(p.x,p.y||0,p.z);g.userData.angle=p.yaw||0;g.visible=p.id!==myId;}for(const[id,g]of people)if(!visibleIds.has(id))g.visible=false;for(const shot of state.shots||[])addShot(shot);}
- const tempVec=new THREE.Vector3(),cameraTarget=new THREE.Vector3();
+ const tempVec=new THREE.Vector3(),cameraTarget=new THREE.Vector3(),focus=new THREE.Vector3();
  function render(state,myId,yaw,pitch,active,entered,t=performance.now()){const dt=Math.min(.06,Math.max(.001,(t-lastTime)/1000));lastTime=t;currentState=state;currentId=myId;own=state?.players?.find(p=>p.id===myId)||null;
  const mix=1-Math.exp(-dt*17);for(const g of objectModels.values()){if(g.userData.target){g.position.lerp(g.userData.target,mix);g.rotation.y+=Math.atan2(Math.sin(g.userData.angle-g.rotation.y),Math.cos(g.userData.angle-g.rotation.y))*mix;}}
  for(const [id,g]of people){if(g.userData.target){const speed=g.position.distanceTo(g.userData.target);g.position.lerp(g.userData.target,mix);g.rotation.y=g.userData.angle;g.userData.limbs?.forEach((l,i)=>l.rotation.x=speed>.015?Math.sin(t*.009+(i%2)*Math.PI)*.38:0);g.visible=g.visible&&id!==myId;}}
@@ -228,7 +228,8 @@ for(const [x,z,w,d] of walls){if(x===14){box(.3,.58,36,14,.29,0);box(.3,.3,36,14
   const ph=myObject?(propTypes[myObject.userData.type]?.height||.8):1.7;
   cameraTarget.copy(pos).add(new THREE.Vector3(0,Math.min(1.25,ph*.64+.17),0));
   const size=myObject?dimensions({type:myObject.userData.type}):null;
-  const distance=myObject?Math.max(2.5,Math.hypot(size.w,size.d)*.75,(size.h||0)*1.25):3.2;
+  const highUp=Math.max(0,cameraTarget.y-1.8);
+  const distance=(myObject?Math.max(2.5,Math.hypot(size.w,size.d)*.75,(size.h||0)*1.25):3.2)+highUp*1.6;
   // Duvardaki tablo veya tavandaki lamba olduğunda istenen yönde kameraya yer yok: oraya
   // zorlanınca duvarın içine girip arkasını gösteriyordu. Bu yüzden önce istenen yön denenir,
   // olmazsa odaya bakan en açık yön taranır; hiçbir yön yetmiyorsa kamera nesnenin içine geçip
@@ -247,27 +248,18 @@ for(const [x,z,w,d] of walls){if(x===14){box(.3,.58,36,14,.29,0);box(.3,.3,36,14
    }
   }
   const reach=Math.min(distance,openness(chosen,[...statics,...movables],Math.min(distance,room)));
-  const place=reach-.18;
-  // Yükseğe asılı bir kılıkta (duvardaki tablo, tavandaki lamba) kendine bakmak ekranı tavanla
-  // doldurur; sıkışmış bir kılıkta ise kamera duvarın içine girer. Bu iki durumda kamera nesnenin
-  // içine geçip oyuncunun baktığı yöne, yani odaya bakar. Kendi kılığı o an gizlenir, böylece
-  // görüntüyü kapatmaz; diğer oyuncular nesneyi görmeye devam eder.
-  const inside=(place<.55||cameraTarget.y>1.9)&&own.status==='alive';
-  if(inside){
-   // Yüksekteki bir kılık doğal olarak odaya doğru, yani hafif aşağı bakar; oyuncu isterse
-   // fareyle yukarı çevirebilir.
-   const droop=Math.min(.5,Math.max(0,cameraTarget.y-1.9)*.35);
-   camera.position.copy(cameraTarget);
-   camera.rotation.set(Math.max(-1.2,Math.min(1.2,pitch-droop)),yaw,0,'YXZ');
-   if(myObject)myObject.visible=false;
-   wasPlaying=true;
-  }else{
-   if(myObject)myObject.visible=true;
-   const desired=cameraTarget.clone().addScaledVector(chosen,place);
-   desired.y=Math.max(.55,Math.min(ROOM.height-.75,desired.y+.5*Math.min(1,place/distance)));
-   if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*24));
-   camera.lookAt(cameraTarget);
-  }
+  const place=Math.max(.5,reach-.18);
+  if(myObject)myObject.visible=true;
+  const desired=cameraTarget.clone().addScaledVector(chosen,place);
+  // Yükseğe asılı kılıklarda (duvardaki tablo, tavandaki lamba) kamera daha geriden ve daha
+  // aşağıdan bakar, böylece ekranı tavan değil oda doldurur; alçak kılıklarda hafif yukarıdan.
+  const rise=highUp>0?-Math.min(1.35,highUp*.85+.25):.5*Math.min(1,place/distance);
+  desired.y=Math.max(.55,Math.min(ROOM.height-.75,desired.y+rise));
+  if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*24));
+  // Yükseğe asılı kılıkta tam nesneye bakmak kareyi tavanla doldurur; bakış noktası biraz aşağı
+  // alınınca hem kılık üstte görünür hem oda görünür kalır.
+  focus.copy(cameraTarget);if(highUp>0)focus.y-=Math.min(1.25,highUp*.85);
+  camera.lookAt(focus);
   const body=people.get(myId);if(body)body.visible=!myObject&&own.status!=='found';gun.visible=false;}
  else{const desired=pos.clone().add(new THREE.Vector3(0,1.64,0));if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*27));camera.rotation.set(Math.max(-1.35,Math.min(1.35,pitch)),yaw,0,'YXZ');gun.visible=!!entered&&own.status!=='found';gun.position.set(.32,-.31+Math.sin(t*.002)*.003,-.53+recoil*.085);gun.rotation.set(recoil*.16,0,-recoil*.07);const fill=Math.max(.02,Math.min(1,(own.ammo??100)/100));waterFill.scale.y=fill;waterFill.position.y=.148+.065*fill;}}
  else{gun.visible=false;camera.position.set(-11.9,1.9,8.8);camera.lookAt(-5.5,.75,3.8);}

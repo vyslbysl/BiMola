@@ -223,3 +223,21 @@ test('duvara asılı bir kılık düşmez, avcı da zıplayabilir',()=>{
  for(let t=21050;t<22200;t+=50){h.input={};h.inputAt=t;tick(r,t,.05);}
  assert.equal(h.y,0,'ve yere indi');
 });
+
+test('koltuğa gömülü minder kılığı kendi yerinde kalır, kaydırınca fırlamaz',()=>{
+ const r=play(room());const p=r.players.b;
+ const cushion=r.objects.find(o=>o.type==='seatPillow'&&o.supportId);
+ assert.ok(cushion,'koltuğa gömülü bir minder var');
+ const home=cushion.y,host=cushion.supportId;
+ p.x=cushion.x;p.z=cushion.z;p.y=cushion.y;
+ assert.ok(possess(r,p,cushion.id).ok);
+ assert.equal(p.y,home,'kılığı alınca minderin kendi yerinde durulur');
+ for(let t=20000;t<20400;t+=50){p.input={x:1};p.inputAt=t;tick(r,t,.05);}
+ assert.equal(+cushion.y.toFixed(3),+home.toFixed(3),`koltukta kayarken yükselmez (${cushion.y.toFixed(2)} m)`);
+ assert.equal(cushion.supportId,host,'desteğini korur');
+ // Kaldırıp bırakınca yüzeye oturur: gömülü duruşa geri sıkışmaz.
+ for(let t=20400;t<21200;t+=50){p.input={lift:1};p.inputAt=t;tick(r,t,.05);}
+ assert.ok(cushion.y>1.4,`kaldırılabilir (${cushion.y.toFixed(2)} m)`);
+ for(let t=21200;t<22600;t+=50){p.input={};p.inputAt=t;tick(r,t,.05);}
+ assert.ok(cushion.y>home&&cushion.y<1,`bırakılınca koltuk yüzeyine oturur (${cushion.y.toFixed(2)} m)`);
+});

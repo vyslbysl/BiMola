@@ -42,14 +42,14 @@ Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm,
 | Q | Odaya uygun rastgele nesneye değiş (3 hak) |
 | C | Sahte kopya bırak (saklanma süresinde de olur, turda 3 hak, isabet alana kadar kalır) |
 | Z / X | Nesnenin yönünü çevir |
-| Fare tekerleği / PgUp · PgDn | Kılığı yükselt · indir (sıradan eşya en fazla 2,2 m; duvara asılı parçalar 3,4 m) |
+| Fare tekerleği / PgUp · PgDn | Kılığı yükselt · indir (sıradan eşya en fazla 2,2 m; duvara asılı parçalar 3,4 m). Koltuğa gömülü bir minder gibi eşyalar kaldırılırken bir sonraki boş yüksekliğe çıkar |
 | Boşluk | Zıpla — saklanan tezgaha ve masaya çıkar, avcı yüksek rafların üstünü görmek için zıplar |
 | F | Konumu sabitle / serbest bırak |
 | Sol tık | Su sık |
 | R | Su deposunu doldur |
 | Esc | Fareyi serbest bırak ve menüyü aç — fare serbest kalır, ekrana tıklayınca oyun geri alır |
 
-Saklanan dönüşünce kendi nesnesini üçüncü şahıs kameradan görür. Kamera, istenen yönde yer yoksa (duvara dayalı bir nesnenin arkası gibi) odaya bakan en açık yöne kayar; duvara asılı tablo veya tavandaki lamba gibi yükseğe asılı bir kılıkta ise nesnenin içine geçip odaya bakar — o sırada kendi kılığın sana görünmez, rakiplerine görünmeye devam eder. Yüksek kılıklarda bakış hafifçe aşağı, odaya doğru eğilir. Avcı birinci şahıs kamerayla su tabancası taşır. Tur sırasında fare imleci her iki tarafta da oyuna kilitlenir; imleç ancak nesne seçme paneli veya bir menü açıkken serbest kalır. Tarayıcı fare kilidini desteklemiyorsa sürükleyerek bakılabilir; Boşluk ile ateş edilebilir. Dokunmatik yön ve ateş düğmeleri de bulunur; ana oynanış masaüstü için tasarlanmıştır.
+Saklanan dönüşünce kendi nesnesini her zaman üçüncü şahıs kameradan görür. Kamera, istenen yönde yer yoksa (duvara dayalı bir nesnenin arkası gibi) odaya bakan en açık yöne kayar, böylece duvarın arkası görünmez. Duvardaki tablo veya tavandaki lamba gibi yükseğe asılı kılıklarda daha geriden ve daha aşağıdan bakar, bakış noktası da nesnenin biraz altına iner; böylece ekranı tavan değil oda doldurur. Avcı birinci şahıs kamerayla su tabancası taşır. Tur sırasında fare imleci her iki tarafta da oyuna kilitlenir; imleç ancak nesne seçme paneli veya bir menü açıkken serbest kalır. Tarayıcı fare kilidini desteklemiyorsa sürükleyerek bakılabilir; Boşluk ile ateş edilebilir. Dokunmatik yön ve ateş düğmeleri de bulunur; ana oynanış masaüstü için tasarlanmıştır.
 
 ## Docker
 

@@ -1,6 +1,6 @@
 import {assembly,moveAssembly,detachChildren,settleObjects} from './public/physics.js';
 import {randomUUID} from 'node:crypto';
-import {free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT} from './public/world.js';
+import {free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,contains} from './public/world.js';
 export {dist};
 export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPEED=4.3,ESCAPE_SPEED=HUNTER_SPEED*2;
 // Hiders can hop onto counters, tables and beds: JUMP_SPEED clears the 1 m kitchen counter with
@@ -226,7 +226,7 @@ export function tick(r,now,dt){
   };
   if(len&&!p.locked){
    x/=len;z/=len;const speed=p.team==='hunter'?HUNTER_SPEED:p.water>0?ESCAPE_SPEED:o?2.8:4;
-   for(const [axis,amount]of [['x',x*speed*dt],['z',z*speed*dt]]){const steps=Math.max(1,Math.ceil(Math.abs(amount)/.1));for(let i=0;i<steps;i++){if(!attempt(p.x+(axis==='x'?amount/steps:0),p.z+(axis==='z'?amount/steps:0)))break;if(o){delete o.supportId;o.anchored=false;}}}
+   for(const [axis,amount]of [['x',x*speed*dt],['z',z*speed*dt]]){const steps=Math.max(1,Math.ceil(Math.abs(amount)/.1));for(let i=0;i<steps;i++){if(!attempt(p.x+(axis==='x'?amount/steps:0),p.z+(axis==='z'?amount/steps:0)))break;if(o){o.anchored=false;const host=r.objects.find(q=>q.id===o.supportId);if(host&&!contains(host,o.x,o.z,-.035))delete o.supportId;}}}
   }
   const spin=Math.max(-1,Math.min(1,Number(p.input.spin)||0));
   if(o&&spin){const turns=Math.max(1,Math.ceil(Math.abs(spin*SPIN_SPEED*dt)/.035));for(let i=0;i<turns;i++)if(!attempt(p.x,p.z,p.y,(o.angle||0)+spin*SPIN_SPEED*dt/turns))break;}
@@ -242,16 +242,28 @@ export function tick(r,now,dt){
    if(o&&lift&&!p.locked&&p.team==='hider'){
     const target=Math.max(mounted?0:ground,Math.min(mounted?LIFT_MAX_MOUNTED:LIFT_MAX,p.y+lift*LIFT_SPEED*dt));
     const delta=target-p.y,steps=Math.max(1,Math.ceil(Math.abs(delta)/.06)),inc=delta/steps;
-    for(let i=0;i<steps;i++){if(!attempt(p.x,p.z,p.y+inc))break;delete o.supportId;o.anchored=false;}
+    const ceiling=mounted?LIFT_MAX_MOUNTED:LIFT_MAX;
+    for(let i=0;i<steps;i++){
+     if(attempt(p.x,p.z,p.y+inc)){delete o.supportId;o.anchored=false;continue;}
+     // Koltuğa gömülü bir minder aradaki yüksekliklere sığmaz; küçük adım engellenirse bir
+     // sonraki boş yüksekliğe atlar, yani eşya yüzeyin üstüne çıkar.
+     let hopped=false;
+     for(let k=2;k<=12&&!hopped;k++)hopped=attempt(p.x,p.z,Math.max(0,Math.min(ceiling,p.y+inc*k)));
+     if(!hopped)break;
+     delete o.supportId;o.anchored=false;
+    }
     p.vy=0;p.grounded=p.y<=ground+.005;
    }else if(mounted){
     // Asılı bir kılık duvarda kalır: yana kaydırılsa da düşmez.
     p.vy=0;p.grounded=true;
    }else{
     if(p.input.jump&&p.grounded&&!p.locked){p.vy=JUMP_SPEED;if(o)delete o.supportId;}
-    p.vy-=GRAVITY*dt;const ny=Math.max(ground,p.y+p.vy*dt);
+    // Koltuğun içine gömülü bir minder gibi, yerleşimi yüzeyin altında olan kılıklar yerinde
+    // kalır: yerçekimi onları yukarı fırlatmaz, yalnızca yukarıdaysa aşağı çeker.
+    const resting=Math.min(ground,p.y);
+    p.vy-=GRAVITY*dt;const ny=Math.max(resting,p.y+p.vy*dt);
     if(o){if(!attempt(p.x,p.z,ny))p.vy=0;}else p.y=ny;
-    if(p.y<=ground+.005){p.vy=0;p.grounded=true;}else p.grounded=false;
+    if(p.y<=resting+.005){p.vy=0;p.grounded=true;}else p.grounded=false;
    }
   }
   if(o){o.x=p.x;o.y=p.y;o.z=p.z;}
