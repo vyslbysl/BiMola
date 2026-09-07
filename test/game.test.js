@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {player,start,tick,action,possess,shuffle,shoot,reload,view,sanitizeSettings,configureRoom,syncBots,setTeam,PREP_MS,ROUND_MS,SHOT_MS,RELOAD_MS,JUMP_SPEED} from '../game.js';
-import {free,propTypes,nearestHit,generateProps,zoneAt,zones,surfaceHeight} from '../public/world.js';
+import {free,propTypes,nearestHit,generateProps,zoneAt,zones,surfaceHeight,fixtures} from '../public/world.js';
 function room(size=1,botMode='off'){
  const r={code:'TEST',host:'a',phase:'lobby',settings:sanitizeSettings({teamSize:size,botMode,swapTeams:false}),players:{a:player('a','Avcı',false,'hunter'),b:player('b','Saklanan',false,'hider')}};
  assert.equal(start(r,1000).ok,true);return r;
@@ -47,7 +47,7 @@ test('exactly three random different transformations preserve position, water an
 test('moving moves the possessed world prop and locking freezes it; stale input stops movement',()=>{
  const {r,p,o}=scenario();possess(r,p,o.id);p.input={x:1,z:0};p.inputAt=20000;tick(r,20000,.1);assert.ok(p.x>0);assert.equal(o.x,p.x);assert.equal(o.z,p.z);
  action(r,p,{kind:'lock'},20001);const x=p.x;tick(r,20050,.1);assert.equal(p.x,x);action(r,p,{kind:'lock'},20060);tick(r,21000,.1);assert.equal(p.x,x);
- p.propId=null;p.x=13.2;p.z=0;p.input={x:1};p.inputAt=22000;tick(r,22000,.1);assert.equal(p.x,13.2,'walls prevent escape');
+ p.propId=null;p.x=13.2;p.z=0;p.input={x:1};p.inputAt=22000;tick(r,22000,.1);assert.ok(p.x<=13.85-.28+.001,'walls prevent escape');
 });
 test('one spray settles a real object; a hidden player still soaks ten at a time up to 100',()=>{
  const dummy=scenario();dummy.p.x=5;assert.ok(shoot(dummy.r,dummy.h,20000));assert.deepEqual(dummy.r.results.at(-1).data,{wet:100,found:false,objectName:'Çamaşır sepeti',real:true});
@@ -62,7 +62,7 @@ test('nearest prop, walls, furniture and pitch determine water hits',()=>{
  const {r,h,p,o}=scenario();possess(r,p,o.id);r.objects.unshift({id:'front',type:'plant',x:0,z:8.5,angle:0,wet:0});assert.ok(shoot(r,h,20000));assert.equal(r.objects[0].wet,100);assert.equal(o.wet,0);
  r.objects=[o];h.x=-1;h.z=-5;o.x=-3.4;o.z=-5;p.x=o.x;p.z=o.z;aim(h,o);shoot(r,h,20500);assert.equal(o.wet,0,'partition occludes');
  const m=scenario();m.h.pitch=1;shoot(m.r,m.h,20000);assert.equal(m.o.wet,0,'aiming above prop misses');
- const hit=nearestHit({x:-8,y:.7,z:11},{x:0,y:0,z:-1},[{id:'behind',type:'plant',x:-8,z:6,wet:0}]);assert.equal(hit.kind,'wall','sofa blocks low shots');
+ const hit=nearestHit({x:-8,y:.7,z:11},{x:0,y:0,z:-1},[...fixtures,{id:'behind',type:'plant',x:-8,z:6,wet:0}]);assert.equal(hit.kind,'object');assert.equal(hit.id,'sofa1','the selectable sofa blocks low shots');
 });
 test('hunter prep and brief use pristine room and omit hider coordinates and all ownership',()=>{
  const r=room(),p=r.players.b;const o={id:'privacy-prop',type:'basket',x:0,y:0,z:7,angle:0,wet:0};r.objects=[o];r.initialObjects=[{...o}];p.x=0;p.z=8;assert.ok(possess(r,p,o.id).ok);p.input={x:1};p.inputAt=2000;tick(r,2000,.1);
@@ -88,7 +88,7 @@ test('bot target selection is unchanged by private prop ownership',()=>{
 test('first choice after prep preserves water already received by the human',()=>{const {r,p,o}=scenario('basket',10);p.water=70;assert.ok(possess(r,p,o.id).ok);assert.equal(p.water,70);assert.equal(o.wet,70);const q=scenario('basket',60);q.p.water=20;assert.ok(possess(q.r,q.p,q.o.id).ok);assert.equal(q.p.water,60);});
 
 test('a hider jumps onto counter height, cannot jump while locked, and falls off an edge',()=>{
- const {r,p}=scenario();p.propId=null;p.locked=false;p.x=8;p.z=-11.7;p.y=0;p.vy=0;p.grounded=true;p.inputAt=20000;
+ const {r,p}=scenario();r.objects=fixtures.filter(o=>o.id==='island').map(o=>({...o}));p.propId=null;p.locked=false;p.x=8;p.z=-11.7;p.y=0;p.vy=0;p.grounded=true;p.inputAt=20000;
  assert.equal(free(8,-10,.28),false,'the island is solid at floor level');
  assert.equal(surfaceHeight(8,-10),1,'and one metre tall to stand on');
  // One hop while walking forward puts the hider up on the island top.
@@ -121,13 +121,13 @@ test('escape speed still cannot cross a 25 cm interior wall',()=>{
 });
 test('every room spawns only what belongs in it and the host can dial the object count',()=>{
  for(const total of [24,51,90]){
-  const props=generateProps(total);
+  const all=generateProps(total);assert.equal(all.filter(o=>fixtures.some(f=>f.id===o.id)).length,fixtures.length);const props=all.filter(o=>!fixtures.some(f=>f.id===o.id));
   assert.ok(Math.abs(props.length-total)<=3,`asked for ${total}, laid out ${props.length}`);
   for(const o of props){
    const zone=zoneAt(o.x,o.z);
    assert.ok(zone,'nothing is dumped in the hallway');
    assert.ok(zone.types.includes(o.type)||zone.signature===o.type,`${o.type} does not belong in ${zone.id}`);
-   assert.ok(o.y===0||o.y===surfaceHeight(o.x,o.z),'anything off the floor sits on a real surface');
+   assert.ok(o.y===0||o.y===surfaceHeight(o.x,o.z,1.05,all.filter(q=>q.id!==o.id)),'anything off the floor sits on a real surface');
   }
   assert.equal(props.filter(o=>o.type==='logTable').length,1,'exactly one log table');
   assert.equal(props.filter(o=>o.type==='painting').length,1,'exactly one painting');
@@ -142,8 +142,8 @@ test('size decides what can be climbed and what can be crawled under',()=>{
  assert.equal(surfaceHeight(6,12,undefined,[{...pouf,type:'mug'}]),0,'a mug is not');
  assert.equal(surfaceHeight(6,12,undefined,[pouf],'pouf'),0,'and never your own disguise');
  // The dining table stands on legs, so a small disguise fits underneath and a person does not.
- assert.equal(free(7.5,1,propTypes.mug.radius,[],null,0,propTypes.mug.height),true,'a mug slips under the dining table');
- assert.equal(free(7.5,1,.28,[],null,0),false,'a player cannot follow it under there');
+ assert.equal(free(7.5,1,propTypes.mug.radius,fixtures.filter(o=>o.id==='dining'),null,0,propTypes.mug.height),true,'a mug slips under the dining table');
+ assert.equal(free(7.5,1,.28,fixtures.filter(o=>o.id==='dining'),null,0),false,'a player cannot follow it under there');
  const table={id:'t',type:'logTable',x:-6,z:5,y:0,angle:0,wet:0};
  assert.equal(free(-6,5,propTypes.mug.radius,[table],null,0,propTypes.mug.height),true,'the log table is open underneath too');
  assert.equal(free(-6,5,.28,[table],null,0),false,'but not to a player on foot');

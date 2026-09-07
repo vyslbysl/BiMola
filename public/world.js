@@ -1,3 +1,5 @@
+import {furniture,fixtures,inventoryTypes} from './inventory.js';
+export {furniture,fixtures};
 // Authoritative shared geometry for the sunny loft. Dimensions are in metres.
 export const ROOM={width:28,depth:36,height:4.8};
 export const walls=[
@@ -10,29 +12,8 @@ export const walls=[
  [4.75,3.6,4.7,.25],[11.35,3.6,4.9,.25], // entry/kitchen divider — gap: door (~x8)
  [-11.35,10.5,4.9,.25],[-4.75,10.5,4.7,.25], // living/bedroom divider — gap: door (~x-8)
 ];
-export const furniture=[
- {id:'sofa1',type:'sofa',x:-8,z:8,w:4.4,d:1.7,h:.9,angle:0,color:'#b86d49'},
- {id:'sofa2',type:'sofa',x:-11.5,z:4,w:3.4,d:1.5,h:.9,angle:Math.PI/2,color:'#e5dac4'},
- {id:'coffee',type:'coffee',x:-8,z:4.2,w:2.5,d:1.5,h:.48},
- {id:'kitchen',type:'counter',x:8,z:-15,w:9.5,d:1.4,h:1},
- {id:'island',type:'island',x:8,z:-10,w:4.5,d:1.9,h:1},
- {id:'dining',type:'dining',x:7.5,z:1,w:4.2,d:2,h:.8,under:.7},
- {id:'shelf1',type:'shelf',x:-12.8,z:-11,w:1.5,d:6,h:2.6},
- {id:'sun-sofa',type:'sofa',x:9,z:15.6,w:3.5,d:1.6,h:.9},
- {id:'sun-table',type:'coffee',x:8.6,z:12.4,w:2.3,d:1.25,h:.48},
- {id:'potting',type:'potting',x:5.1,z:6,w:3.2,d:1.15,h:.9,under:.66},
- {id:'sun-bench',type:'bench',x:5,z:15.7,w:3.3,d:.8,h:.45,under:.33},
- {id:'shelf2',type:'shelf',x:12.8,z:10,w:1.2,d:6,h:2.3},
- {id:'game',type:'game',x:-.5,z:-11,w:2.7,d:1.65,h:.82,under:.64},
- {id:'bench',type:'bench',x:0,z:15.5,w:4,d:.8,h:.45,under:.33},
- {id:'desk',type:'desk',x:-9,z:-15.5,w:4,d:1.6,h:.8,under:.7},
- // Bedroom, north-west: a double bed between two nightstands, wardrobe along the west wall.
- {id:'bed',type:'bed',x:-8.5,z:15.4,w:2.15,d:2.2,h:.62},
- {id:'night1',type:'nightstand',x:-6.85,z:16.35,w:.52,d:.44,h:.55},
- {id:'night2',type:'nightstand',x:-10.15,z:16.35,w:.52,d:.44,h:.55},
- {id:'wardrobe',type:'wardrobe',x:-13.25,z:13,w:.9,d:3,h:2.3},
-];
 export const propTypes={
+ ...inventoryTypes,
  plant:{name:'Saksı bitkisi',radius:.4,height:1.25,color:'#dba57b',icon:'✿'},
  stool:{name:'Tabure',radius:.36,height:.65,color:'#519798',icon:'▤',under:.5},
  basket:{name:'Çamaşır sepeti',radius:.4,height:.56,color:'#c89b65',icon:'▧'},
@@ -47,16 +28,7 @@ export const propTypes={
  painting:{name:'Tablo',radius:.55,height:1.3,color:'#5c4530',icon:'◫'},
  pillow:{name:'Yastık',radius:.33,height:.2,color:'#e8dfcc',icon:'▱'},
 };
-// Walls and furniture never move, so the collision footprints are built once and reused. Each
-// entry carries its height: anything shorter than the mover's feet can be stood on, not bumped into.
-let obstacles=null;
-export function staticObstacles(){
- if(!obstacles)obstacles=[
-  ...walls.map(([x,z,w,d])=>[x,z,w,d,ROOM.height,0]),
-  ...furniture.map(f=>[f.x,f.z,Math.abs(Math.cos(f.angle||0))*f.w+Math.abs(Math.sin(f.angle||0))*f.d,Math.abs(Math.sin(f.angle||0))*f.w+Math.abs(Math.cos(f.angle||0))*f.d,f.h,f.under||0]),
- ];
- return obstacles;
-}
+export function staticObstacles(){return walls.map(([x,z,w,d])=>[x,z,w,d,ROOM.height,0]);}
 // Five themed rooms open onto the central hallway. Every round scrambles which object sits where
 // (and what it is) inside its own room, so hiding spots are never the same twice while still
 // belonging to the room they are in: laundry basket in the bedroom, mug in the kitchen.
@@ -90,33 +62,25 @@ export const STAND_MAX_HEIGHT=1.05,STAND_MIN_RADIUS=.34,BODY_HEIGHT=1.75;
 // What is underfoot at this spot: the tallest thing short enough to climb. Furniture counts, and so
 // do the broader props — a pouf, a suitcase, a laundry basket or the log table are all wide enough
 // to perch on, while a mug or a stack of books is not.
-export function surfaceHeight(x,z,maxHeight=STAND_MAX_HEIGHT,objects=[],ignoreId=null){
- let best=0;
- for(const f of furniture){
-  if(f.h>maxHeight||f.h<=best)continue;
-  const angle=f.angle||0,w=Math.abs(Math.cos(angle))*f.w+Math.abs(Math.sin(angle))*f.d,d=Math.abs(Math.sin(angle))*f.w+Math.abs(Math.cos(angle))*f.d;
-  if(Math.abs(x-f.x)<w/2&&Math.abs(z-f.z)<d/2)best=f.h;
- }
- for(const o of objects){
-  if(o.id===ignoreId||o.decoyOf===ignoreId)continue;
-  const t=propTypes[o.type];if(!t||t.radius<STAND_MIN_RADIUS)continue;
-  const top=(o.y||0)+t.height;
-  if(top>maxHeight||top<=best)continue;
-  if(Math.hypot(x-o.x,z-o.z)<t.radius*.85)best=top;
- }
- return best;
+export function dimensions(o){const t=propTypes[o.type];return {w:t.w||t.radius*2,d:t.d||t.radius*2,h:t.height,under:t.under||0};}
+export function localPoint(o,x,z){const a=o.angle||0,c=Math.cos(a),s=Math.sin(a),dx=x-o.x,dz=z-o.z;return {x:dx*c-dz*s,z:dx*s+dz*c};}
+export function contains(o,x,z,pad=0){const p=localPoint(o,x,z),d=dimensions(o);return Math.abs(p.x)<d.w/2+pad&&Math.abs(p.z)<d.d/2+pad;}
+export function objectDistance(p,o){const q=localPoint(o,p.x,p.z),d=dimensions(o);return Math.hypot(Math.max(0,Math.abs(q.x)-d.w/2),Math.max(0,Math.abs(q.z)-d.d/2));}
+export function surfaceHeight(x,z,maxHeight=STAND_MAX_HEIGHT,objects=fixtures,ignoreId=null){
+ let best=0;for(const o of objects){if(o.id===ignoreId||o.decoyOf===ignoreId)continue;const t=propTypes[o.type];if(!t||t.flat||Math.min(t.w||t.radius*2,t.d||t.radius*2)<.34)continue;
+ const top=(o.y||0)+(t.surface??t.height);if(top>maxHeight||top<=best)continue;if(contains(o,x,z,-.015))best=top;}return best;
 }
 function spot(zone,radius,placed){
  const x=zone.xmin+PLACEMENT_PAD+Math.random()*Math.max(.2,zone.xmax-zone.xmin-2*PLACEMENT_PAD);
  const z=zone.zmin+PLACEMENT_PAD+Math.random()*Math.max(.2,zone.zmax-zone.zmin-2*PLACEMENT_PAD);
  // Counters, tables and benches are valid shelves for small clutter, so a mug can start up on the
  // island — but a stool or a plant pot always begins the round on the floor where it belongs.
- const y=radius<=.35?surfaceHeight(x,z):0;
+ const y=radius<=.35?surfaceHeight(x,z,STAND_MAX_HEIGHT,placed):0;
  return free(x,z,radius,placed,null,y)?{x,y,z}:null;
 }
 export function generateProps(total=DEFAULT_PROP_COUNT){
  total=Math.max(MIN_PROP_COUNT,Math.min(MAX_PROP_COUNT,Math.round(total)||DEFAULT_PROP_COUNT));
- const placed=[];
+ const placed=fixtures.map(o=>({...o}));
  for(const zone of zones){
   const target=Math.max(2,Math.round(zone.count/DEFAULT_PROP_COUNT*total));
   // A room's `signature` piece always exists, exactly once, and eats one slot from the regular
@@ -145,29 +109,66 @@ export const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 // `y` is the mover's feet, `height` how tall the mover is. Anything shorter than the feet is being
 // stood on, and anything with enough clearance underneath (a table, a stool) can be crawled under by
 // a short enough disguise — which is why a mug slips under the dining table and a person does not.
-export function free(x,z,radius=.28,objects=[],ignoreId=null,y=0,height=BODY_HEIGHT){
- if(!Number.isFinite(x)||!Number.isFinite(z)||Math.abs(x)>13.6-radius||Math.abs(z)>17.6-radius)return false;
- const clear=y+.06,top=y+height;
- if(staticObstacles().some(([a,b,w,d,h,under])=>h>clear&&!(under>0&&top<=under)&&Math.abs(x-a)<w/2+radius&&Math.abs(z-b)<d/2+radius))return false;
+function overlaps(a,b){
+ const A=dimensions(a),B=dimensions(b),angles=[a.angle||0,b.angle||0];
+ for(const angle of angles)for(const offset of [0,Math.PI/2]){const x=Math.cos(angle+offset),z=-Math.sin(angle+offset),radius=(o,d)=>Math.abs(Math.cos(o.angle||0)*x-Math.sin(o.angle||0)*z)*d.w/2+Math.abs(Math.sin(o.angle||0)*x+Math.cos(o.angle||0)*z)*d.d/2;
+ if(Math.abs((a.x-b.x)*x+(a.z-b.z)*z)>=radius(a,A)+radius(b,B)-.025)return false;}
+ return true;
+}
+export function free(x,z,radius=.28,objects=fixtures,ignoreId=null,y=0,height=BODY_HEIGHT,shape=null,ignoreIds=new Set()){
+ if(!Number.isFinite(x)||!Number.isFinite(z)||!Number.isFinite(y))return false;
+ const mover=shape?{...shape,x,y,z}:{type:'__body',x,y,z,angle:0};
+ const size=shape?dimensions(mover):{w:radius*2,d:radius*2,h:height};
+ const a=mover.angle||0,ex=Math.abs(Math.cos(a))*size.w/2+Math.abs(Math.sin(a))*size.d/2,ez=Math.abs(Math.sin(a))*size.w/2+Math.abs(Math.cos(a))*size.d/2;
+ if(Math.abs(x)+ex>13.85||Math.abs(z)+ez>17.85||y+height>ROOM.height)return false;
+ const clear=y+.055,top=y+height;
+ // Walls use the full oriented footprint, never only a large object's centre.
+ for(const [wx,wz,w,d] of walls){const wall={type:'__wall',x:wx,z:wz,angle:0};if(shape){if(overlapSized(mover,size,wall,{w,d}))return false;}else if(Math.abs(x-wx)<w/2+radius&&Math.abs(z-wz)<d/2+radius)return false;}
  return !objects.some(o=>{
-  if(o.id===ignoreId||o.decoyOf===ignoreId)return false;
-  const t=propTypes[o.type];
-  return (o.y||0)+(t?.height||.5)>clear&&!(t?.under>0&&top<=(o.y||0)+t.under)&&Math.hypot(x-o.x,z-o.z)<radius+(t?.radius||.3)*.7;
+  if(o.id===ignoreId||o.decoyOf===ignoreId||ignoreIds.has(o.id))return false;
+  const t=propTypes[o.type];if(!t||t.flat)return false;
+  const base=o.y||0;if(base+t.height<=clear||base>=top-.025||t.under&&top<=base+t.under)return false;
+  return shape?overlaps(mover,o):contains(o,x,z,radius*.85);
  });
 }
+function overlapSized(a,A,b,B){
+ for(const angle of [a.angle||0,b.angle||0])for(const offset of [0,Math.PI/2]){const x=Math.cos(angle+offset),z=-Math.sin(angle+offset),radius=(o,d)=>Math.abs(Math.cos(o.angle||0)*x-Math.sin(o.angle||0)*z)*d.w/2+Math.abs(Math.sin(o.angle||0)*x+Math.cos(o.angle||0)*z)*d.d/2;if(Math.abs((a.x-b.x)*x+(a.z-b.z)*z)>=radius(a,A)+radius(b,B)-.025)return false;}return true;
+}
+// Doorways retain enough clearance for a person even when a movable table or its copy is nearby.
+const doors=[[-2.4,-9,.85,1.6],[-2.4,8,.85,1.6],[-2.4,14,.85,1.6],[2.4,-7,.85,1.6],[2.4,10,.85,1.6],[-8,-1.4,1.6,.85],[-8,10.5,1.6,.85],[8,3.6,1.6,.85]];
+export function blocksDoor(o){const d=dimensions(o);if(Math.max(d.w,d.d)<1.5||propTypes[o.type].flat)return false;return doors.some(([x,z,w,d])=>overlapSized(o,dimensions(o),{x,z,angle:0},{w,d}));}
 // Sampled densely enough that a 25 cm interior wall can never slip between two samples — that gap
 // used to let a hider claim an object on the far side of a wall and teleport straight through it.
 export function sight(a,b){
  const y=Math.min(a.y||0,b.y||0),n=Math.max(2,Math.ceil(dist(a,b)*16));
- for(let i=1;i<n;i++){const t=i/n;if(!free(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t,.06,[],null,y))return false;}
+ for(let i=1;i<n;i++){const t=i/n;if(walls.some(([x,z,w,d])=>Math.abs(a.x+(b.x-a.x)*t-x)<w/2+.02&&Math.abs(a.z+(b.z-a.z)*t-z)<d/2+.02))return false;}
  return true;
 }
 export function rayBox(origin,direction,bounds){let lo=0,hi=30;for(const axis of ['x','y','z']){const d=direction[axis],v=origin[axis];if(Math.abs(d)<1e-8){if(v<bounds.min[axis]||v>bounds.max[axis])return null;}else{let a=(bounds.min[axis]-v)/d,b=(bounds.max[axis]-v)/d;if(a>b)[a,b]=[b,a];lo=Math.max(lo,a);hi=Math.min(hi,b);if(lo>hi)return null;}}return lo;}
 export function nearestHit(origin,direction,objects,players=[]){let hit={distance:28,kind:'miss',point:{x:origin.x+direction.x*28,y:origin.y+direction.y*28,z:origin.z+direction.z*28}};function check(bounds,kind,id){const d=rayBox(origin,direction,bounds);if(d!==null&&d<hit.distance)hit={distance:d,kind,id,point:{x:origin.x+direction.x*d,y:origin.y+direction.y*d,z:origin.z+direction.z*d}};}
  for(const [x,z,w,d] of walls)check({min:{x:x-w/2,y:0,z:z-d/2},max:{x:x+w/2,y:ROOM.height,z:z+d/2}},'wall');
- for(const f of furniture){const angle=f.angle||0,w=Math.abs(Math.cos(angle))*f.w+Math.abs(Math.sin(angle))*f.d,d=Math.abs(Math.sin(angle))*f.w+Math.abs(Math.cos(angle))*f.d;check({min:{x:f.x-w/2,y:0,z:f.z-d/2},max:{x:f.x+w/2,y:f.h,z:f.z+d/2}},'wall');}
- for(const o of objects){const t=propTypes[o.type],base=o.y||0;check({min:{x:o.x-t.radius,y:base,z:o.z-t.radius},max:{x:o.x+t.radius,y:base+t.height,z:o.z+t.radius}},'object',o.id);}
+ for(const o of objects){
+  const size=dimensions(o),p=localPoint(o,origin.x,origin.z),a=o.angle||0,c=Math.cos(a),s=Math.sin(a);
+  const localOrigin={x:p.x,y:origin.y-(o.y||0),z:p.z},localDirection={x:direction.x*c-direction.z*s,y:direction.y,z:direction.x*s+direction.z*c};
+  for(const part of hitParts(o)){const d=rayBox(localOrigin,localDirection,{min:{x:part.x-part.w/2,y:part.y,z:part.z-part.d/2},max:{x:part.x+part.w/2,y:part.y+part.h,z:part.z+part.d/2}});if(d!==null&&d<hit.distance)hit={distance:d,kind:'object',id:o.id,point:{x:origin.x+direction.x*d,y:origin.y+direction.y*d,z:origin.z+direction.z*d}};}
+ }
  for(const p of players){const base=p.y||0;check({min:{x:p.x-.28,y:base,z:p.z-.28},max:{x:p.x+.28,y:base+1.75,z:p.z+.28}},'player',p.id);}
  return hit;
 }
-export function pathTo(from,to){const key=(x,z)=>x+','+z,sx=Math.round(from.x),sz=Math.round(from.z),queue=[[sx,sz]],parent=new Map([[key(sx,sz),null]]);let end;for(let i=0;i<queue.length;i++){const [x,z]=queue[i];if(Math.hypot(x-to.x,z-to.z)<1.6){end=[x,z];break;}for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,nz=z+dz,k=key(nx,nz);if(!parent.has(k)&&free(nx,nz,.3)){parent.set(k,[x,z]);queue.push([nx,nz]);}}}if(!end)return[];const result=[];while(end&&(end[0]!==sx||end[1]!==sz)){result.unshift({x:end[0],z:end[1]});end=parent.get(key(...end));}return result;}
+export function pathTo(from,to,objects=fixtures){const key=(x,z)=>x+','+z,sx=Math.round(from.x),sz=Math.round(from.z),queue=[[sx,sz]],parent=new Map([[key(sx,sz),null]]);let end;for(let i=0;i<queue.length;i++){const [x,z]=queue[i];if(Math.hypot(x-to.x,z-to.z)<1.6){end=[x,z];break;}for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,nz=z+dz,k=key(nx,nz);if(!parent.has(k)&&free(nx,nz,.3,objects)){parent.set(k,[x,z]);queue.push([nx,nz]);}}}if(!end)return[];const result=[];while(end&&(end[0]!==sx||end[1]!==sz)){result.unshift({x:end[0],z:end[1]});end=parent.get(key(...end));}return result;}
+
+export function hitParts(o){
+ const t=propTypes[o.type],d=dimensions(o),f=t.f;
+ if(f?.type==='shelf')return [{x:f.x<0?-d.w/2+.025:d.w/2-.025,y:0,z:0,w:.05,h:d.h,d:d.d},...Array.from({length:5},(_,i)=>({x:0,y:.13+i*(d.h-.16)/4,z:0,w:d.w,h:.045,d:d.d})),...[-1,1].map(sign=>({x:0,y:0,z:sign*(d.d/2-.025),w:d.w,h:d.h,d:.05}))];
+ if(d.under>0)return [{x:0,y:d.under,z:0,w:d.w,h:Math.max(.06,d.h-d.under),d:d.d},...[-1,1].flatMap(x=>[-1,1].map(z=>({x:x*(d.w/2-.1),y:0,z:z*(d.d/2-.1),w:.1,h:d.under,d:.1})))];
+ return [{x:0,y:0,z:0,w:d.w,h:d.h,d:d.d}];
+}
+export function reachable(p,o,objects){
+ if(objectDistance(p,o)>4.5)return false;
+ const q=localPoint(o,p.x,p.z),d=dimensions(o),a=o.angle||0,c=Math.cos(a),s=Math.sin(a);
+ const lx=Math.max(-d.w/2+.02,Math.min(d.w/2-.02,q.x)),lz=Math.max(-d.d/2+.02,Math.min(d.d/2-.02,q.z));
+ const from={x:p.x,y:(p.y||0)+1.3,z:p.z},to={x:o.x+c*lx+s*lz,y:Math.max((o.y||0)+.01,Math.min((o.y||0)+d.h-.01,from.y)),z:o.z-s*lx+c*lz};
+ const len=Math.hypot(to.x-from.x,to.y-from.y,to.z-from.z);if(len<.05)return true;
+ const direction={x:(to.x-from.x)/len,y:(to.y-from.y)/len,z:(to.z-from.z)/len};
+ const hit=nearestHit(from,direction,objects.filter(q=>q.id!==p.propId));return hit.id===o.id||hit.distance>=len-.035;
+}

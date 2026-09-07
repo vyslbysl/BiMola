@@ -1,5 +1,6 @@
+import {assembly,moveAssembly,detachChildren,settleObjects} from './public/physics.js';
 import {randomUUID} from 'node:crypto';
-import {free,sight,dist,propTypes,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT} from './public/world.js';
+import {free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT} from './public/world.js';
 export {dist};
 export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPEED=4.3,ESCAPE_SPEED=HUNTER_SPEED*2;
 // Hiders can hop onto counters, tables and beds: JUMP_SPEED clears the 1 m kitchen counter with
@@ -85,7 +86,7 @@ export function start(r,now=Date.now()){
  return {ok:true};
 }
 function notice(r,text,now){r.events.push({id:randomUUID(),text,at:now});r.events=r.events.slice(-5);}
-function accessibleObject(r,p,id){const o=r.objects?.find(o=>o.id===id);return o&&!o.owner&&!o.decoyOf&&o.wet<100&&dist(p,o)<=4.5&&sight(p,o)?o:null;}
+function accessibleObject(r,p,id){const o=r.objects?.find(o=>o.id===id);return o&&!o.owner&&!o.decoyOf&&o.wet<100&&reachable(p,o,r.objects)?o:null;}
 function bindProp(p,o){p.propId=o.id;o.owner=p.id;p.x=o.x;p.z=o.z;p.y=o.y||0;p.vy=0;p.grounded=true;o.wet=Math.max(o.wet,p.water);p.water=o.wet;p.locked=false;}
 export function possess(r,p,objectId,now=Date.now()){
  if(!p||!['prep','play'].includes(r.phase)||p.team!=='hider'||p.status!=='alive')return {ok:false,error:'Şu anda nesne seçemezsin.'};
@@ -99,17 +100,19 @@ export function shuffle(r,p){
  const o=r.objects.find(o=>o.id===p.propId&&o.owner===p.id);if(!o)return {ok:false,error:'Nesne bulunamadı.'};
  // Stay on-theme for whatever room the object is currently in (a kitchen mug shouldn't turn into a
  // suitcase); out in the hallway, where no room theme applies, any type is still fair game.
- const pool=zoneAt(o.x,o.z)?.types||commonTypes;
- const candidates=pool.filter(type=>type!==o.type&&free(o.x,o.z,propTypes[type].radius,r.objects,o.id));
+ const zone=zoneAt(o.x,o.z);const pool=[...new Set([...(zone?.types||commonTypes),...fixtures.filter(q=>!zone||zoneAt(q.x,q.z)?.id===zone.id).map(q=>q.type)])];
+ const attached=new Set(assembly(r.objects,o).map(q=>q.id));const candidates=pool.filter(type=>{const q={...o,type},t=propTypes[type];return type!==o.type&&!blocksDoor(q)&&free(o.x,o.z,t.radius,r.objects,o.id,o.y||0,t.height,q,attached);});
  if(!candidates.length)return {ok:false,error:'Burada başka bir nesneye yer yok. Biraz açık alana geç.'};
- o.type=candidates[Math.floor(Math.random()*candidates.length)];p.changes--;return {ok:true,type:o.type,changes:p.changes};
+ detachChildren(r.objects,o);delete o.supportId;o.anchored=false;o.type=candidates[Math.floor(Math.random()*candidates.length)];p.changes--;return {ok:true,type:o.type,changes:p.changes};
 }
 export function decoy(r,p,now=Date.now()){
  if(!p||r.phase!=='play'||p.team!=='hider'||p.status!=='alive'||!p.propId)return {ok:false,error:'Kopyayı av başladıktan sonra, bir nesneyken bırakabilirsin.'};
  if(p.decoys<=0)return {ok:false,error:'Bu turdaki üç kopyanı kullandın.'};
  const source=r.objects.find(o=>o.id===p.propId&&o.owner===p.id);
  if(!source||!p.grounded)return {ok:false,error:'Kopyayı yere bastığında bırak.'};
- r.objects.push({id:randomUUID(),type:source.type,x:source.x,y:source.y||0,z:source.z,angle:source.angle,wet:source.wet,decoyOf:source.id});
+ if(blocksDoor(source))return {ok:false,error:'Kopyayı kapı geçişinden uzağa bırak.'};
+ const group=assembly(r.objects,source),rootId=randomUUID(),ids=new Map(group.map(q=>[q.id,q===source?rootId:randomUUID()]));
+ for(const q of group)r.objects.push({id:ids.get(q.id),type:q.type,x:q.x,y:q.y||0,z:q.z,angle:q.angle,wet:q.wet,decoyOf:source.id,decoyRoot:rootId,...(ids.has(q.supportId)?{supportId:ids.get(q.supportId)}:{})});
  p.decoys--;p.locked=false;
  return {ok:true,decoys:p.decoys};
 }
@@ -153,7 +156,7 @@ export function shoot(r,p,now=Date.now()){
   // A hit that lands on nobody's disguise is confirmed as a real object right away — no need to keep
   // emptying the tank into it to find out. A hit hider is unlocked immediately so they can run for it.
   const real=hit.kind==='object'&&!target&&!o?.decoyOf;
-  if(o?.decoyOf){burst(r,o,now,'decoy');r.objects=r.objects.filter(q=>q.id!==o.id);}
+  if(o?.decoyOf){burst(r,o,now,'decoy');r.objects=r.objects.filter(q=>q.id!==o.id&&(!o.decoyRoot||q.decoyRoot!==o.decoyRoot));}
   if(found){burst(r,target,now);target.status='found';target.input={};target.locked=true;if(o)delete o.owner;notice(r,`${target.name} bulundu!`,now);}
   else if(target)target.locked=false;
   r.results.push({playerId:p.id,event:'hit',data:{wet,found,objectName,real,...(o?.decoyOf?{decoy:true}:{})}});
@@ -183,7 +186,7 @@ function botInput(r,p,now){
  const direction={x:-Math.sin(p.yaw)*Math.cos(p.pitch),y:Math.sin(p.pitch),z:-Math.cos(p.yaw)*Math.cos(p.pitch)};
  const check=nearestHit({x:p.x,y:1.62+(p.y||0),z:p.z},direction,r.objects);
  if(d<10&&check.kind==='object'&&check.id===target.id){p.input={fire:true};if(p.ammo<4)reload(r,p,now);return;}
- if(now>p.pathAt||!p.path.length){p.path=pathTo(p,target);p.pathAt=now+2000;}
+ if(now>p.pathAt||!p.path.length){p.path=pathTo(p,target,r.objects);p.pathAt=now+2000;}
  while(p.path.length&&dist(p,p.path[0])<.5)p.path.shift();const waypoint=p.path[0]||target;
  let x=waypoint.x-p.x,z=waypoint.z-p.z,len=Math.hypot(x,z);if(len>.1){x/=len;z/=len;}
  // A short local detour keeps static props from trapping a grid path follower.
@@ -211,33 +214,28 @@ export function tick(r,now,dt){
   // player cannot, and anything broad enough doubles as a step to jump on.
   const tall=o?propTypes[o.type].height:BODY_HEIGHT;
   let x=Number(p.input.x)||0,z=Number(p.input.z)||0,len=Math.hypot(x,z);
+  const attempt=(nx,nz,ny=p.y,angle=o?.angle||0)=>{
+   if(o){const moved=moveAssembly(r,o,{x:nx,z:nz,y:ny,angle});if(moved){p.x=o.x;p.z=o.z;p.y=o.y;}return moved;}
+   if(!free(nx,nz,radius,r.objects,null,ny,tall))return false;p.x=nx;p.z=nz;p.y=ny;return true;
+  };
   if(len&&!p.locked){
-   x/=len;z/=len;
-   // A hider who has taken at least one hit breaks cover and can sprint at double the hunter's speed to
-   // try to escape further hits. Movement is sub-stepped (never more than ~15cm per check) so this burst
-   // of speed still can't skip clean through a wall in a single tick.
-   const speed=p.team==='hunter'?HUNTER_SPEED:p.water>0?ESCAPE_SPEED:o?2.8:4;
-   const maxStep=.15,dx=x*speed*dt,dz=z*speed*dt;
-   const stepsX=Math.max(1,Math.ceil(Math.abs(dx)/maxStep)),incX=dx/stepsX;
-   for(let i=0;i<stepsX;i++){if(!free(p.x+incX,p.z,radius,r.objects,p.propId,p.y,tall))break;p.x+=incX;}
-   const stepsZ=Math.max(1,Math.ceil(Math.abs(dz)/maxStep)),incZ=dz/stepsZ;
-   for(let i=0;i<stepsZ;i++){if(!free(p.x,p.z+incZ,radius,r.objects,p.propId,p.y,tall))break;p.z+=incZ;}
+   x/=len;z/=len;const speed=p.team==='hunter'?HUNTER_SPEED:p.water>0?ESCAPE_SPEED:o?2.8:4;
+   for(const [axis,amount]of [['x',x*speed*dt],['z',z*speed*dt]]){const steps=Math.max(1,Math.ceil(Math.abs(amount)/.1));for(let i=0;i<steps;i++){if(!attempt(p.x+(axis==='x'?amount/steps:0),p.z+(axis==='z'?amount/steps:0)))break;if(o){delete o.supportId;o.anchored=false;}}}
   }
-  // The disguise no longer snaps to wherever the player looks; it is aimed by hand with Z/X, so a
-  // painting or a speaker can be turned to face the room properly.
   const spin=Math.max(-1,Math.min(1,Number(p.input.spin)||0));
-  if(o&&spin)o.angle=(o.angle||0)+spin*SPIN_SPEED*dt;
-  // Gravity and jumping: hiders can hop onto anything up to counter height and hide up there.
-  // Hunters keep both feet on the floor, so their height never leaves zero.
-  if(p.team==='hider'){
-   const ground=surfaceHeight(p.x,p.z,STAND_MAX_HEIGHT,r.objects,p.propId);
-   if(p.input.jump&&p.grounded&&!p.locked)p.vy=JUMP_SPEED;
-   p.vy-=GRAVITY*dt;p.y+=p.vy*dt;
-   if(p.y<=ground){p.y=ground;p.vy=0;p.grounded=true;}else p.grounded=false;
+  if(o&&spin){const turns=Math.max(1,Math.ceil(Math.abs(spin*SPIN_SPEED*dt)/.035));for(let i=0;i<turns;i++)if(!attempt(p.x,p.z,p.y,(o.angle||0)+spin*SPIN_SPEED*dt/turns))break;}
+  if(p.team==='hider'&&!o?.anchored){
+   const parent=r.objects.find(q=>q.id===o?.supportId);
+   const ground=parent?(parent.y||0)+(propTypes[parent.type].surface??propTypes[parent.type].height):surfaceHeight(p.x,p.z,Math.max(STAND_MAX_HEIGHT,p.y+.08),r.objects,p.propId);
+   if(p.input.jump&&p.grounded&&!p.locked){p.vy=JUMP_SPEED;if(o)delete o.supportId;}
+   p.vy-=GRAVITY*dt;const ny=Math.max(ground,p.y+p.vy*dt);
+   if(o){if(!attempt(p.x,p.z,ny))p.vy=0;}else p.y=ny;
+   if(p.y<=ground+.005){p.vy=0;p.grounded=true;}else p.grounded=false;
   }
   if(o){o.x=p.x;o.y=p.y;o.z=p.z;}
   if(p.team==='hunter'&&p.input.fire)shoot(r,p,now);
  }
+ settleObjects(r,dt);
  if(r.phase==='play'){
   const hiders=ps.filter(p=>p.team==='hider'),hunters=ps.filter(p=>p.team==='hunter');
   if(!hunters.length){r.phase='end';r.winner='hider';r.reason='Tüm avcılar odadan ayrıldı.';}
@@ -260,6 +258,6 @@ export function view(r,id,now=Date.now()){
   effects:blind?[]:(r.effects||[]).filter(e=>now-e.at<1800&&dist(eye,e)<35),
   shots:blind?[]:(r.shots||[]).filter(s=>now-s.at<650),events:blind?[]:(r.events||[]).filter(e=>now-e.at<4500)
  };
- if(me.team==='hider'&&!me.propId&&['prep','play'].includes(r.phase))packet.nearby=(r.objects||[]).filter(o=>accessibleObject(r,me,o.id)).map(o=>({id:o.id,type:o.type,y:o.y||0,distance:dist(me,o)})).sort((a,b)=>a.distance-b.distance);
+ if(me.team==='hider'&&!me.propId&&['prep','play'].includes(r.phase))packet.nearby=(r.objects||[]).filter(o=>accessibleObject(r,me,o.id)).map(o=>({id:o.id,type:o.type,y:o.y||0,distance:objectDistance(me,o)})).sort((a,b)=>a.distance-b.distance);
  return packet;
 }
