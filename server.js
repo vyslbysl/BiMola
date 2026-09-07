@@ -25,14 +25,17 @@ export function createGameServer(){
    if(!data||typeof data!=='object'||Array.isArray(data))return ack({error:'Oda bilgisi geçersiz.'});
    const name=String(data.name||'Misafir').trim().slice(0,18)||'Misafir';let r;
    if(data.code){
-    r=rooms.get(String(data.code).trim().toUpperCase());if(!r)return ack({error:'Bu oda bulunamadı. Kodu kontrol et.'});
+    r=rooms.get(String(data.code).replace(/\D/g,''));if(!r)return ack({error:'Bu oda bulunamadı. Kodu kontrol et.'});
     if(r&&s.data.code===r.code)return ack({code:r.code,id:s.id});
     if(!['lobby','end'].includes(r.phase))return ack({error:'Tur devam ediyor. Tur bitince tekrar katıl.'});
     if(Object.values(r.players).filter(p=>!p.bot).length>=r.settings.teamSize*2)return ack({error:`Oda dolu (${r.settings.teamSize*2} kişi).`});
     if(r.practice)return ack({error:'Bu bir antrenman odası. Yeni oda oluştur.'});
    }
    leave(s);
-   if(!r){let code;do{code=randomUUID().slice(0,6).toUpperCase();}while(rooms.has(code));r={code,host:s.id,players:{},phase:'lobby',until:0,round:0,practice:!!data.practice,settings:sanitizeSettings(data.settings)};rooms.set(code,r);}
+   // Four digits: short enough to read out over the phone, and 9000 of them is plenty at once.
+   if(!r){let code=null;for(let i=0;i<400&&!code;i++){const candidate=String(1000+Math.floor(Math.random()*9000));if(!rooms.has(candidate))code=candidate;}
+    if(!code)return ack({error:'Şu anda yeni oda açılamıyor. Az sonra tekrar dene.'});
+    r={code,host:s.id,players:{},phase:'lobby',until:0,round:0,practice:!!data.practice,settings:sanitizeSettings(data.settings)};rooms.set(code,r);}
    let team=data.role==='hunter'?'hunter':'hider';
    const humans=t=>Object.values(r.players).filter(p=>!p.bot&&p.team===t).length;
    if(r.settings.teamSelection==='auto')team=humans('hunter')<humans('hider')?'hunter':'hider';

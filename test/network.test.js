@@ -11,7 +11,9 @@ test('two clients: configurable lobby, permissions, chosen props, water shots, h
  try{
   a=await connect(url);b=await connect(url);
   const first=await a.emitWithAck('join',{name:'Ada',role:'hunter',settings:{teamSize:1,botMode:'off',swapTeams:false}});
-  const second=await b.emitWithAck('join',{name:'Bora',role:'hider',code:first.code});assert.equal(first.code,second.code);const r=g.rooms.get(first.code);
+  const second=await b.emitWithAck('join',{name:'Bora',role:'hider',code:first.code});assert.equal(first.code,second.code);
+  assert.match(first.code,/^\d{4}$/,'oda kodu 4 haneli sayıdır');
+  await delay(400);assert.equal((await b.emitWithAck('join',{name:'Bora',role:'hider',code:' '+first.code+' '})).code,first.code,'boşluklu kod da bulunur');const r=g.rooms.get(first.code);
   assert.ok((await b.emitWithAck('settings',{teamSize:6})).error);assert.ok((await b.emitWithAck('start')).error);assert.equal(r.phase,'lobby');
   assert.ok((await a.emitWithAck('settings',{hideSeconds:15,roundSeconds:120})).ok);assert.ok((await a.emitWithAck('start')).ok);assert.equal(r.phase,'prep');
   const p=r.players[b.id],h=r.players[a.id];r.objects=[{id:'test-object',type:'basket',x:0,z:7,angle:0,wet:0}];p.x=0;p.z=8;h.x=0;h.z=10;
