@@ -51,7 +51,7 @@ test('moving moves the possessed world prop and locking freezes it; stale input 
 });
 test('one spray settles a real object; a hidden player still soaks ten at a time up to 100',()=>{
  const dummy=scenario();dummy.p.x=5;assert.ok(shoot(dummy.r,dummy.h,20000));assert.deepEqual(dummy.r.results.at(-1).data,{wet:100,found:false,objectName:'Çamaşır sepeti',real:true});
- const {r,h,p,o}=scenario();possess(r,p,o.id);for(let i=0;i<9;i++){assert.ok(shoot(r,h,20000+i*SHOT_MS));assert.equal(p.status,'alive');assert.equal(r.results.at(-1).data.found,false);}
+ const {r,h,p,o}=scenario();possess(r,p,o.id);for(let i=0;i<9;i++){assert.ok(shoot(r,h,20000+i*SHOT_MS));assert.equal(p.status,'alive');assert.equal(r.results.at(-1).data.found,false);assert.equal(r.results.at(-1).data.real,false);}
  assert.equal(p.water,90);assert.ok(shoot(r,h,20000+9*SHOT_MS));assert.equal(o.wet,100);assert.equal(p.status,'found');assert.equal(r.results.at(-1).data.found,true);tick(r,22000,.025);assert.equal(r.winner,'hunter');
 });
 test('water cannon rate, 25-shot tank, empty-tank refusal, and two-second reload are authoritative',()=>{
@@ -65,7 +65,7 @@ test('nearest prop, walls, furniture and pitch determine water hits',()=>{
  const hit=nearestHit({x:-8,y:.7,z:11},{x:0,y:0,z:-1},[{id:'behind',type:'plant',x:-8,z:6,wet:0}]);assert.equal(hit.kind,'wall','sofa blocks low shots');
 });
 test('hunter prep and brief use pristine room and omit hider coordinates and all ownership',()=>{
- const r=room(),p=r.players.b;const o=r.objects[0];p.x=o.x;p.z=o.z;possess(r,p,o.id);p.input={x:1};p.inputAt=2000;tick(r,2000,.1);
+ const r=room(),p=r.players.b;const o={id:'privacy-prop',type:'basket',x:0,y:0,z:7,angle:0,wet:0};r.objects=[o];r.initialObjects=[{...o}];p.x=0;p.z=8;assert.ok(possess(r,p,o.id).ok);p.input={x:1};p.inputAt=2000;tick(r,2000,.1);
  for(const phase of ['prep','brief']){r.phase=phase;const packet=view(r,'a',2000);assert.equal(packet.players.find(p=>p.id==='b').x,undefined);assert.equal(packet.players.find(p=>p.id==='b').propId,undefined);assert.deepEqual(packet.objects.find(q=>q.id===o.id),r.initialObjects.find(q=>q.id===o.id));assert.ok(packet.objects.every(q=>!('owner'in q)));}
  r.phase='play';const packet=view(r,'a',2000);assert.equal(packet.players.find(p=>p.id==='b').x,undefined);assert.equal(packet.players.find(p=>p.id==='b').propId,undefined);assert.equal(packet.objects.find(q=>q.id===o.id).x,o.x);assert.ok(!JSON.stringify(packet).includes('"owner"'));
  const own=view(r,'b',2000);assert.equal(own.players.find(p=>p.id==='b').propId,o.id);assert.equal(own.players.find(p=>p.id==='b').changes,3);
@@ -148,4 +148,33 @@ test('size decides what can be climbed and what can be crawled under',()=>{
  assert.equal(free(-6,5,propTypes.mug.radius,[table],null,0,propTypes.mug.height),true,'the log table is open underneath too');
  assert.equal(free(-6,5,.28,[table],null,0),false,'but not to a player on foot');
  assert.equal(free(-6,5,propTypes.plant.radius,[table],null,0,propTypes.plant.height),false,'a tall plant pot does not fit under it');
+});
+
+test('three permanent decoys: authoritative limits, escape clearance, no ownership leak, round reset',()=>{
+ const {r,p,o}=scenario();assert.ok(possess(r,p,o.id).ok);
+ r.phase='prep';assert.equal(action(r,p,{kind:'decoy'},1000).ok,false);r.phase='play';
+ assert.equal(action(r,r.players.a,{kind:'decoy'},1000).ok,false);
+ for(let i=0;i<3;i++)assert.ok(action(r,p,{kind:'decoy'},2000+i).ok);
+ assert.equal(p.decoys,0);assert.equal(action(r,p,{kind:'decoy'},2100).ok,false);
+ const copies=r.objects.filter(q=>q.decoyOf);assert.equal(copies.length,3);
+ assert.ok(free(p.x,p.z,propTypes[o.type].radius,r.objects,o.id));
+ assert.equal(surfaceHeight(p.x,p.z,1.05,r.objects,o.id),0,'copies cannot lift their own creator');
+ tick(r,50000,.025);assert.equal(r.objects.filter(q=>q.decoyOf).length,3,'no timeout');
+ const packet=view(r,r.players.a.id,50000);assert.ok(packet.objects.every(q=>!('decoyOf' in q)&&!('owner' in q)));assert.equal(packet.players.find(q=>q.id===p.id).decoys,undefined);
+ r.phase='end';assert.ok(start(r,60000).ok);assert.equal(p.decoys,3);assert.ok(r.objects.every(q=>!q.decoyOf));
+});
+test('one hit destroys only the copy and emits a visual effect without eliminating its creator',()=>{
+ const {r,p,h,o}=scenario();assert.ok(possess(r,p,o.id).ok);assert.ok(action(r,p,{kind:'decoy'},2000).ok);
+ const copy=r.objects.find(q=>q.decoyOf);p.z=o.z=4;
+ aim(h,copy);assert.ok(shoot(r,h,3000));assert.ok(!r.objects.includes(copy));assert.equal(p.water,0);assert.equal(p.status,'alive');assert.equal(r.effects.at(-1).kind,'decoy');
+ assert.equal(r.results.at(-1).data.found,false);assert.equal(r.results.at(-1).data.decoy,true);assert.equal(r.results.at(-1).data.real,false);
+});
+test('decoys cannot be possessed and cannot be placed while airborne or found',()=>{
+ const {r,p,o}=scenario();assert.ok(possess(r,p,o.id).ok);p.grounded=false;assert.equal(action(r,p,{kind:'decoy'},2000).ok,false);p.grounded=true;assert.ok(action(r,p,{kind:'decoy'},2000).ok);
+ const copy=r.objects.find(q=>q.decoyOf),q=player('c','Other',false,'hider');q.x=0;q.z=8;r.players.c=q;assert.equal(possess(r,q,copy.id).ok,false);
+ p.status='found';assert.equal(action(r,p,{kind:'decoy'},2000).ok,false);
+});
+test('full soak emits one reveal animation, hidden during hunter preparation',()=>{
+ const {r,p,h,o}=scenario('basket',90);assert.ok(possess(r,p,o.id).ok);assert.ok(shoot(r,h,3000));assert.equal(p.status,'found');assert.equal(r.effects.length,1);assert.equal(r.effects[0].kind,'reveal');assert.equal(view(r,h.id,3000).effects.length,1);
+ r.phase='prep';assert.equal(view(r,h.id,3000).effects.length,0);
 });

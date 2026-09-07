@@ -39,6 +39,7 @@ Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm,
 | Fare | Bakış ve kamera (tur boyunca fare imleci oyuna kilitlenir) |
 | E | İlk nesneyi seç (3D önizlemeli panel) |
 | Q | Odaya uygun rastgele nesneye değiş (3 hak) |
+| C | Sahte kopya bırak (turda 3 hak, isabet alana kadar kalır) |
 | Z / X | Nesnenin yönünü çevir |
 | Boşluk (saklanan) | Zıpla — tezgaha, masaya, yatağa çık |
 | F | Konumu sabitle / serbest bırak |
@@ -67,3 +68,13 @@ npm test
 Nesne seçimi, üç rastgele değişim, su miktarının korunması, duvar arkasına isabetin engellenmesi, yeniden doldurma, hazırlık gizliliği, kapasite/bot ayarları, yetki kontrolleri ve gerçek Socket.IO bağlantıları test edilir. Bot simülasyonları 3'e 3, 6'ya 6 ve 12'ye 12 çalıştırılmıştır. Bu, 24 farklı cihazla gerçek ağ yük testi yapıldığı anlamına gelmez.
 
 Oda ve tur durumu bellektedir, sunucu yeniden başlayınca silinir. Hesap/kalıcı ilerleme/otomatik yeniden bağlanma yoktur. Botlar basit nesne inceleme davranışı kullanır; insan oyuncuların stratejik seviyesinde değildir. Sahne, fotoğraf varlıkları yerine ayrıntılı geometri ve üretilen malzeme dokularıyla oluşturulmuştur. WebGL 2 ve donanım hızlandırması gerekir. Yazı tipleri Google Fonts üzerinden yüklenir, çevrimdışıyken sistem yazı tipleri kullanılır.
+
+## Kış bahçesi, sahte kopyalar ve görsel geri bildirim
+
+Doğudaki eski giriş/vitrin odası artık oturma alanı, okuma sehpası, bank ve bitki bakım tezgâhıyla kış bahçesidir. Sabit mobilyaların çarpışma alanları sunucuyla ortaktır; rastgele eşyalar oda temasına göre üretilir.
+
+Saklananlar av başladıktan sonra bir nesneyken ve yere basarken C veya ekrandaki Sahte kopya düğmesiyle bulundukları yerde aynı görünümde bir kopya bırakabilir. Turda üç hak vardır; Q dönüşüm haklarından bağımsızdır. Kopyalar zaman aşımına uğramaz. Tek su isabetinde parçacık animasyonuyla kaybolur; asıl oyuncunun su miktarını değiştirmez. Kopyaya dönüşülemez, yeni tur tüm kopyaları temizler.
+
+%100 ıslanan oyuncuda su halkası, yükselen siluet ve damla animasyonu oynar. Ses başlangıçta kapalıdır; bütün kurallar ve geri bildirimler görseldir. İstenirse menüden ses açılabilir.
+
+Docker yapılandırması Node 24 Alpine, ayrıcalıksız kullanıcı, sağlık kontrolü ve 3000 portunu içerir. 3B görüntü oyuncunun tarayıcısında çizilir; Docker sunucusunda ekran kartı gerekmez. Bu geliştirme bilgisayarında Docker kurulu olmadığı için konteyner derleme/çalıştırma doğrulaması yapılamadı; yerel Node sunucusu ve Socket.IO testleriyle doğrulandı.

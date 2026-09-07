@@ -18,6 +18,10 @@ export const furniture=[
  {id:'island',type:'island',x:8,z:-10,w:4.5,d:1.9,h:1},
  {id:'dining',type:'dining',x:7.5,z:1,w:4.2,d:2,h:.8,under:.7},
  {id:'shelf1',type:'shelf',x:-12.8,z:-11,w:1.5,d:6,h:2.6},
+ {id:'sun-sofa',type:'sofa',x:9,z:15.6,w:3.5,d:1.6,h:.9},
+ {id:'sun-table',type:'coffee',x:8.6,z:12.4,w:2.3,d:1.25,h:.48},
+ {id:'potting',type:'potting',x:5.1,z:6,w:3.2,d:1.15,h:.9,under:.66},
+ {id:'sun-bench',type:'bench',x:5,z:15.7,w:3.3,d:.8,h:.45,under:.33},
  {id:'shelf2',type:'shelf',x:12.8,z:10,w:1.2,d:6,h:2.3},
  {id:'game',type:'game',x:-.5,z:-11,w:2.7,d:1.65,h:.82,under:.64},
  {id:'bench',type:'bench',x:0,z:15.5,w:4,d:.8,h:.45,under:.33},
@@ -69,7 +73,7 @@ export const zones=[
  // Study / game corner: desk clutter plus a stray ball by the game table.
  {id:'office',name:'Çalışma köşesi',xmin:-13.85,xmax:-2.4,zmin:-17.85,zmax:-1.4,types:['case','stool','ball','speaker','bookstack'],count:12},
  // Entry / display shelf: suitcase, plant, ball, watering can — mudroom-style catch-all items.
- {id:'entry',name:'Giriş / vitrin',xmin:2.4,xmax:13.85,zmin:3.6,zmax:17.85,types:['case','plant','ball','watering'],count:10},
+ {id:'entry',name:'Kış bahçesi',xmin:2.4,xmax:13.85,zmin:3.6,zmax:17.85,types:['plant','watering','bookstack','stool'],count:10},
 ];
 // Which room (if any) a point belongs to. Drives both a round's layout and Q's random change,
 // which stays on-theme for the room the object is currently standing in.
@@ -94,7 +98,7 @@ export function surfaceHeight(x,z,maxHeight=STAND_MAX_HEIGHT,objects=[],ignoreId
   if(Math.abs(x-f.x)<w/2&&Math.abs(z-f.z)<d/2)best=f.h;
  }
  for(const o of objects){
-  if(o.id===ignoreId)continue;
+  if(o.id===ignoreId||o.decoyOf===ignoreId)continue;
   const t=propTypes[o.type];if(!t||t.radius<STAND_MIN_RADIUS)continue;
   const top=(o.y||0)+t.height;
   if(top>maxHeight||top<=best)continue;
@@ -146,7 +150,7 @@ export function free(x,z,radius=.28,objects=[],ignoreId=null,y=0,height=BODY_HEI
  const clear=y+.06,top=y+height;
  if(staticObstacles().some(([a,b,w,d,h,under])=>h>clear&&!(under>0&&top<=under)&&Math.abs(x-a)<w/2+radius&&Math.abs(z-b)<d/2+radius))return false;
  return !objects.some(o=>{
-  if(o.id===ignoreId)return false;
+  if(o.id===ignoreId||o.decoyOf===ignoreId)return false;
   const t=propTypes[o.type];
   return (o.y||0)+(t?.height||.5)>clear&&!(t?.under>0&&top<=(o.y||0)+t.under)&&Math.hypot(x-o.x,z-o.z)<radius+(t?.radius||.3)*.7;
  });

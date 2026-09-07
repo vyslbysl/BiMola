@@ -23,7 +23,7 @@ export function sanitizeSettings(input={},previous=defaultSettings){
  return settings;
 }
 export function player(id,name,bot=false,team='hider'){
- return {id,name,bot,team:teams.includes(team)?team:'hider',role:teams.includes(team)?team:'hider',x:0,y:0,z:11,vy:0,grounded:true,yaw:0,pitch:0,status:'alive',input:{},inputAt:0,propId:null,water:0,changes:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0};
+ return {id,name,bot,team:teams.includes(team)?team:'hider',role:teams.includes(team)?team:'hider',x:0,y:0,z:11,vy:0,grounded:true,yaw:0,pitch:0,status:'alive',input:{},inputAt:0,propId:null,water:0,changes:3,decoys:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0};
 }
 const count=(r,team,humansOnly=false)=>Object.values(r.players).filter(p=>p.team===team&&(!humansOnly||!p.bot)).length;
 export function syncBots(r){
@@ -65,7 +65,7 @@ export function start(r,now=Date.now()){
  r.settings=sanitizeSettings(r.settings);syncBots(r);
  if(teams.some(team=>count(r,team)!==r.settings.teamSize))return {error:`Başlamak için her takımda ${r.settings.teamSize} kişi olmalı. Botlarla doldurmayı açabilirsin.`};
  if((r.round||0)>0&&r.settings.swapTeams){for(const p of Object.values(r.players))p.team=p.role=p.team==='hunter'?'hider':'hunter';[r.settings.hunterBots,r.settings.hiderBots]=[r.settings.hiderBots,r.settings.hunterBots];}
- r.round=(r.round||0)+1;r.phase='prep';r.until=now+r.settings.hideSeconds*1000;r.winner=null;r.reason=null;r.shots=[];r.results=[];r.events=[];r.objects=generateProps(r.settings.objectCount);r.initialObjects=r.objects.map(o=>({...o}));
+ r.round=(r.round||0)+1;r.phase='prep';r.until=now+r.settings.hideSeconds*1000;r.winner=null;r.reason=null;r.shots=[];r.effects=[];r.results=[];r.events=[];r.objects=generateProps(r.settings.objectCount);r.initialObjects=r.objects.map(o=>({...o}));
  let h=0,k=0;const spawned=[];
  for(const p of Object.values(r.players)){
   const i=p.team==='hunter'?h++:k++;let x=-3+(i%6)*1.2,z=p.team==='hunter'?-3-Math.floor(i/6)*1.1:10-Math.floor(i/6)*1.1;
@@ -80,12 +80,12 @@ export function start(r,now=Date.now()){
    }
   }
   if(!free(x,z,.28,r.objects)||spawned.some(q=>dist({x,z},q)<.65)){const base={x,z};search:for(let radius=.75;radius<6;radius+=.75)for(let j=0;j<16;j++){const px=base.x+Math.cos(j*Math.PI/8)*radius,pz=base.z+Math.sin(j*Math.PI/8)*radius;if(free(px,pz,.28,r.objects)&&!spawned.some(q=>dist({x:px,z:pz},q)<.65)){x=px;z=pz;break search;}}}spawned.push({x,z});
-  Object.assign(p,{role:p.team,x,z,y:0,vy:0,grounded:true,yaw:p.team==='hunter'?Math.PI:0,pitch:0,status:'alive',input:{},inputAt:now,propId:null,water:0,changes:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0,goal:null,botTarget:null,botTargetUntil:0,botScanned:new Set(),botBurstUntil:0,lastProgressAt:now,lastProgress:{x,z}});
+  Object.assign(p,{role:p.team,x,z,y:0,vy:0,grounded:true,yaw:p.team==='hunter'?Math.PI:0,pitch:0,status:'alive',input:{},inputAt:now,propId:null,water:0,changes:3,decoys:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0,goal:null,botTarget:null,botTargetUntil:0,botScanned:new Set(),botBurstUntil:0,lastProgressAt:now,lastProgress:{x,z}});
  }
  return {ok:true};
 }
 function notice(r,text,now){r.events.push({id:randomUUID(),text,at:now});r.events=r.events.slice(-5);}
-function accessibleObject(r,p,id){const o=r.objects?.find(o=>o.id===id);return o&&!o.owner&&o.wet<100&&dist(p,o)<=4.5&&sight(p,o)?o:null;}
+function accessibleObject(r,p,id){const o=r.objects?.find(o=>o.id===id);return o&&!o.owner&&!o.decoyOf&&o.wet<100&&dist(p,o)<=4.5&&sight(p,o)?o:null;}
 function bindProp(p,o){p.propId=o.id;o.owner=p.id;p.x=o.x;p.z=o.z;p.y=o.y||0;p.vy=0;p.grounded=true;o.wet=Math.max(o.wet,p.water);p.water=o.wet;p.locked=false;}
 export function possess(r,p,objectId,now=Date.now()){
  if(!p||!['prep','play'].includes(r.phase)||p.team!=='hider'||p.status!=='alive')return {ok:false,error:'Şu anda nesne seçemezsin.'};
@@ -104,6 +104,18 @@ export function shuffle(r,p){
  if(!candidates.length)return {ok:false,error:'Burada başka bir nesneye yer yok. Biraz açık alana geç.'};
  o.type=candidates[Math.floor(Math.random()*candidates.length)];p.changes--;return {ok:true,type:o.type,changes:p.changes};
 }
+export function decoy(r,p,now=Date.now()){
+ if(!p||r.phase!=='play'||p.team!=='hider'||p.status!=='alive'||!p.propId)return {ok:false,error:'Kopyayı av başladıktan sonra, bir nesneyken bırakabilirsin.'};
+ if(p.decoys<=0)return {ok:false,error:'Bu turdaki üç kopyanı kullandın.'};
+ const source=r.objects.find(o=>o.id===p.propId&&o.owner===p.id);
+ if(!source||!p.grounded)return {ok:false,error:'Kopyayı yere bastığında bırak.'};
+ r.objects.push({id:randomUUID(),type:source.type,x:source.x,y:source.y||0,z:source.z,angle:source.angle,wet:source.wet,decoyOf:source.id});
+ p.decoys--;p.locked=false;
+ return {ok:true,decoys:p.decoys};
+}
+function burst(r,p,now,kind='reveal'){
+ r.effects??=[];r.effects.push({id:randomUUID(),kind,x:p.x,y:p.y||0,z:p.z,at:now});r.effects=r.effects.slice(-32);
+}
 export function reload(r,p,now=Date.now()){
  if(!p||!['prep','play'].includes(r.phase)||p.team!=='hunter'||p.status!=='alive'||p.reloadUntil>now||p.ammo>=100)return {ok:false};
  p.reloadUntil=now+RELOAD_MS;return {ok:true};
@@ -111,6 +123,7 @@ export function reload(r,p,now=Date.now()){
 export function action(r,p,data,now=Date.now()){
  if(!data||typeof data!=='object')return {ok:false,error:'Geçersiz işlem.'};
  if(data.kind==='possess')return possess(r,p,data.objectId,now);
+ if(data.kind==='decoy')return decoy(r,p,now);
  if(data.kind==='shuffle')return shuffle(r,p);
  if(data.kind==='reload')return reload(r,p,now);
  if(data.kind==='lock'&&p?.team==='hider'&&p.propId&&p.status==='alive'&&['prep','play'].includes(r.phase)){p.locked=!p.locked;return {ok:true,locked:p.locked};}
@@ -139,15 +152,16 @@ export function shoot(r,p,now=Date.now()){
   const found=!!target&&target.status==='alive'&&wet>=100;
   // A hit that lands on nobody's disguise is confirmed as a real object right away — no need to keep
   // emptying the tank into it to find out. A hit hider is unlocked immediately so they can run for it.
-  const real=hit.kind==='object'&&!target;
-  if(found){target.status='found';target.input={};target.locked=true;if(o)delete o.owner;notice(r,`${target.name} bulundu!`,now);}
+  const real=hit.kind==='object'&&!target&&!o?.decoyOf;
+  if(o?.decoyOf){burst(r,o,now,'decoy');r.objects=r.objects.filter(q=>q.id!==o.id);}
+  if(found){burst(r,target,now);target.status='found';target.input={};target.locked=true;if(o)delete o.owner;notice(r,`${target.name} bulundu!`,now);}
   else if(target)target.locked=false;
-  r.results.push({playerId:p.id,event:'hit',data:{wet,found,objectName,real}});
+  r.results.push({playerId:p.id,event:'hit',data:{wet,found,objectName,real,...(o?.decoyOf?{decoy:true}:{})}});
  }
  return true;
 }
 function autoHide(r,p){
- const choices=r.objects.filter(o=>!o.owner&&o.wet<100);
+ const choices=r.objects.filter(o=>!o.owner&&!o.decoyOf&&o.wet<100);
  if(!choices.length)return;
  const visible=choices.filter(o=>sight(p,o));visible.sort((a,b)=>dist(p,a)-dist(p,b));
  const o=p.bot?choices[Math.floor(Math.random()*choices.length)]:(visible[0]||choices.sort((a,b)=>dist(p,a)-dist(p,b))[0]);bindProp(p,o);p.locked=true;
@@ -184,6 +198,7 @@ function botInput(r,p,now){
 export function tick(r,now,dt){
  if(r.phase==='prep'&&now>=r.until){for(const p of Object.values(r.players))if(p.bot&&p.team==='hider'&&p.status==='alive'&&!p.propId)autoHide(r,p);r.phase='play';r.until=now+r.settings.roundSeconds*1000;notice(r,'Su savaşı başladı. Saklananları bul!',now);}
  if(!['prep','play'].includes(r.phase))return;
+ r.effects=(r.effects||[]).filter(e=>now-e.at<1800);
  dt=Math.max(0,Math.min(.1,dt));r.shots=r.shots.filter(s=>now-s.at<650);
  const ps=Object.values(r.players);
  for(const p of ps){
@@ -239,9 +254,10 @@ export function view(r,id,now=Date.now()){
   players:Object.values(r.players).map(p=>{
    const own=p.id===id,teammate=p.team===me.team,transformed=!!p.propId;
    const visible=own||inMatch&&!blind&&(teammate||!transformed&&p.status==='alive'&&dist(eye,p)<35&&sight(eye,p));
-   return {id:p.id,name:p.name,bot:p.bot,team:p.team,role:p.team,status:p.status,visible:!!visible,...(visible?{x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch}:{}),...((own||teammate)&&inMatch?{propId:p.propId}:{}),...(own?{water:p.water,changes:p.changes,locked:p.locked,ammo:p.ammo,reloadUntil:p.reloadUntil}:{} )};
+   return {id:p.id,name:p.name,bot:p.bot,team:p.team,role:p.team,status:p.status,visible:!!visible,...(visible?{x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch}:{}),...((own||teammate)&&inMatch?{propId:p.propId}:{}),...(own?{water:p.water,changes:p.changes,decoys:p.decoys,locked:p.locked,ammo:p.ammo,reloadUntil:p.reloadUntil}:{} )};
   }),
   objects:inMatch?objects.map(({id,type,x,y,z,angle,wet})=>({id,type,x,y:y||0,z,angle,wet})):[],
+  effects:blind?[]:(r.effects||[]).filter(e=>now-e.at<1800&&dist(eye,e)<35),
   shots:blind?[]:(r.shots||[]).filter(s=>now-s.at<650),events:blind?[]:(r.events||[]).filter(e=>now-e.at<4500)
  };
  if(me.team==='hider'&&!me.propId&&['prep','play'].includes(r.phase))packet.nearby=(r.objects||[]).filter(o=>accessibleObject(r,me,o.id)).map(o=>({id:o.id,type:o.type,y:o.y||0,distance:dist(me,o)})).sort((a,b)=>a.distance-b.distance);
