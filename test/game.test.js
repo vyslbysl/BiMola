@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {player,start,tick,action,possess,shuffle,shoot,reload,view,sanitizeSettings,configureRoom,syncBots,setTeam,PREP_MS,ROUND_MS,SHOT_MS,RELOAD_MS,JUMP_SPEED,LIFT_MAX} from '../game.js';
-import {free,propTypes,nearestHit,generateProps,zoneAt,zones,surfaceHeight,fixtures} from '../public/world.js';
+import {free,propTypes,nearestHit,generateProps,zoneAt,zones,surfaceHeight,fixtures,fitsHome} from '../public/world.js';
 function room(size=1,botMode='off'){
  const r={code:'TEST',host:'a',phase:'lobby',settings:sanitizeSettings({teamSize:size,botMode,swapTeams:false}),players:{a:player('a','Avcı',false,'hunter'),b:player('b','Saklanan',false,'hider')}};
  assert.equal(start(r,1000).ok,true);return r;
@@ -240,4 +240,27 @@ test('koltuğa gömülü minder kılığı kendi yerinde kalır, kaydırınca f�
  assert.ok(cushion.y>1.4,`kaldırılabilir (${cushion.y.toFixed(2)} m)`);
  for(let t=21200;t<22600;t+=50){p.input={};p.inputAt=t;tick(r,t,.05);}
  assert.ok(cushion.y>home&&cushion.y<1,`bırakılınca koltuk yüzeyine oturur (${cushion.y.toFixed(2)} m)`);
+});
+
+test('Q ile dönüşüm bulunduğun yere yakışan eşyalarla sınırlı kalır',()=>{
+ const r=play(room());const p=r.players.b;
+ const onFloor=r.objects.find(o=>!o.supportId&&!o.owner&&(o.y||0)<.2&&propTypes[o.type]&&!propTypes[o.type].large);
+ assert.ok(onFloor,'yerde duran bir eşya var');
+ p.x=onFloor.x;p.z=onFloor.z;p.y=onFloor.y||0;
+ assert.ok(possess(r,p,onFloor.id).ok);
+ let seen=0;
+ for(let i=0;i<14;i++){
+  p.changes=3;const res=shuffle(r,p);if(!res.ok)continue;seen++;
+  assert.ok(fitsHome(res.type,'floor'),`${res.type} yerde durabilecek bir eşya olmalı`);
+  assert.ok(!['seatPillow','mug','plate','placemat','flatBook','knife'].includes(res.type),`${res.type} yerde durmaz`);
+ }
+ assert.ok(seen>0,'en az bir dönüşüm denendi');
+ const onTop=r.objects.find(o=>o.type==='mug'&&!o.owner);
+ if(onTop){
+  const q=player('c','C',false,'hider');r.players.c=q;q.x=onTop.x;q.z=onTop.z;q.y=onTop.y;
+  if(possess(r,q,onTop.id).ok){
+   q.changes=3;const res=shuffle(r,q);
+   if(res.ok)assert.ok(fitsHome(res.type,'support'),`${res.type} yüzeyde durabilir olmalı`);
+  }
+ }
 });

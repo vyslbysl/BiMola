@@ -28,6 +28,11 @@ export function createScene(container){
  m.floor.roughness=.7;m.floor.bumpScale=.006;m.oak.bumpScale=.003;
  installHiggsfieldMaterials(renderer,m);
  const architecture=new THREE.Group();scene.add(architecture);
+ // Duvarlar, cam cephe, üst silme ve tavan panelleri ayrı ayrı gizlenebilir parçalar olarak
+ // kurulur. Kamera bir duvarın arkasına ya da panelin üstüne geçtiğinde arada kalan parça o kare
+ // boyunca görünmez olur; oyuncu odayı içeriden görmeye devam eder, kamera kaçmak zorunda kalmaz.
+ const shell=new THREE.Group();scene.add(shell);const hideable=[];
+ const shellPiece=()=>{const g=new THREE.Group();shell.add(g);hideable.push(g);return g;};
  const geoCache=new Map();function geo(key,fn){if(!geoCache.has(key))geoCache.set(key,fn());return geoCache.get(key);}
  function mesh(g,material,parent=architecture){const o=new THREE.Mesh(g,material);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o;}
  function box(w,h,d,x,y,z,material=m.wall,parent=architecture){const o=mesh(geo(`b${w},${h},${d}`,()=>new THREE.BoxGeometry(w,h,d)),material,parent);o.position.set(x,y,z);return o;}
@@ -44,8 +49,8 @@ export function createScene(container){
  box(28.4,.22,36.4,0,-.12,0,m.floor);
  function tiledFloor(x,z,w,d){const g=new THREE.PlaneGeometry(w,d);const uv=g.getAttribute('uv');for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*w/4.8,uv.getY(i)*d/4.8);const o=mesh(g,m.clay);o.rotation.x=-Math.PI/2;o.position.set(x,.006,z);o.castShadow=false;}
  tiledFloor(0,0,4.55,35.65);tiledFloor(8.2,-7.1,11.35,21.1);tiledFloor(8.2,10.7,11.35,14.1);
-for(const [x,z,w,d] of walls){if(x===14){box(.3,.58,36,14,.29,0);box(.3,.3,36,14,4.66,0);for(let v=-18;v<=18;v+=6){box(.38,4.2,.44,14,2.65,v,m.wall);box(.5,.13,.65,13.94,.62,v,m.stone);}}else{box(w,ROOM.height,d,x,ROOM.height/2,z);box(w+.02,.13,d+.025,x,.07,z,m.white);box(w+.025,.095,d+.025,x,4.59,z,m.white);}}
- for(let z=-15;z<=15;z+=6){box(.62,.1,5.64,13.82,.63,z,m.stone);for(const dz of [-2.78,0,2.78])box(.09,3.85,.065,13.83,2.62,z+dz,m.white);for(const y of [.72,2.75,4.53])box(.09,.065,5.6,13.83,y,z,m.white);const glass=box(.015,3.75,5.4,13.92,2.62,z,m.glass);glass.castShadow=false;}
+for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.29,0,m.wall,g);box(.3,.3,36,14,4.66,0,m.wall,g);for(let v=-18;v<=18;v+=6){box(.38,4.2,.44,14,2.65,v,m.wall,g);box(.5,.13,.65,13.94,.62,v,m.stone,g);}}else{box(w,ROOM.height,d,x,ROOM.height/2,z,m.wall,g);box(w+.02,.13,d+.025,x,.07,z,m.white,g);box(w+.025,.095,d+.025,x,4.59,z,m.white,g);}}
+ const glazing=shellPiece();for(let z=-15;z<=15;z+=6){box(.62,.1,5.64,13.82,.63,z,m.stone,glazing);for(const dz of [-2.78,0,2.78])box(.09,3.85,.065,13.83,2.62,z+dz,m.white,glazing);for(const y of [.72,2.75,4.53])box(.09,.065,5.6,13.83,y,z,m.white,glazing);const glass=box(.015,3.75,5.4,13.92,2.62,z,m.glass,glazing);glass.castShadow=false;}
 
  // Door reveals from the reference: painted sage frames, real depth, quiet architectural scale.
  function portal(x,z,width,rotation=0){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rotation;architecture.add(g);for(const side of [-1,1]){box(.14,2.88,.33,side*(width/2+.06),1.44,0,m.sage,g);box(.045,2.78,.39,side*(width/2-.035),1.39,0,m.sage,g);}box(width+.26,.15,.33,0,2.86,0,m.sage,g);box(width+.02,1.84,.255,0,3.83,0,m.wall,g);}
@@ -53,12 +58,12 @@ for(const [x,z,w,d] of walls){if(x===14){box(.3,.58,36,14,.29,0);box(.3,.3,36,14
  portal(2.4,-7,1.8,Math.PI/2);portal(2.4,10,1.8,Math.PI/2);
  portal(-8,-1.4,1.8);portal(-8,10.5,1.8);portal(8,3.6,1.8);
  // Ceiling reveals and cornices visually bring each room to a human residential scale.
- for(const [x,z,w,d] of walls){if(x===14)continue;box(w+.05,.1,d+.05,x,3.3,z,m.white);}
+ const trim=shellPiece();for(const [x,z,w,d] of walls){if(x===14)continue;box(w+.05,.1,d+.05,x,3.3,z,m.white,trim);}
  for(const [x,z,w,d] of [[-8,-9.6,11.2,16.2],[-8,4.5,11.2,11.6],[-8,14.1,11.2,7],[8,-7.2,11.2,20.8],[8,10.7,11.2,14.2]]){
   const panel=box(w,.10,d,x,3.48,z,m.wall);panel.castShadow=false;
  }
  // Frosted ceiling panels give the hallway soft skylight without exposing an industrial roof.
- for(const z of [-13,-3,7,16]){const panel=box(4.5,.07,5.5,0,3.54,z,m.white);panel.castShadow=false;}
+ const panels=shellPiece();for(const z of [-13,-3,7,16]){const panel=box(4.5,.07,5.5,0,3.54,z,m.white,panels);panel.castShadow=false;}
  // High ceiling and exposed beams stay quiet above the game space.
  for(const x of [-10,10])box(8,.12,36,x,4.86,0,m.wall).castShadow=false;for(const z of [-15,-7,1,9,17]){box(28,.25,.21,0,4.6,z,m.oak);box(.18,.17,36,0,4.72,0,m.white);}for(const x of [-4,4])box(.16,.17,36,x,4.74,0,m.white);
  for(const x of [-5,5])box(2,.14,36,x,4.8,0,m.wall).castShadow=false;for(const z of [-15,-5,5,15])box(8,.14,6,0,4.8,z,m.wall).castShadow=false;for(const z of [-10,0,10]){const skylight=box(8,.02,4,0,4.9,z,m.glass);skylight.castShadow=false;for(const dz of [-2,2])box(8,.16,.1,0,4.75,z+dz,m.white);for(const x of [-2,0,2])box(.075,.13,4,x,4.78,z,m.white);}
@@ -140,7 +145,7 @@ for(const [x,z,w,d] of walls){if(x===14){box(.3,.58,36,14,.29,0);box(.3,.3,36,14
  }
  // The entrance has a generous arch-like frame, a panelled oak door and small glazing.
  box(3.1,3.6,.13,0,1.8,17.78,m.oak);for(const side of [-1,1]){box(1.32,3.34,.08,side*.72,1.73,17.68,m.white);box(1.15,2.25,.045,side*.72,2.19,17.62,m.glass).castShadow=false;rod([side*.19,1.05,17.55],[side*.19,1.4,17.55],.021,m.brass);}
- bake(architecture);
+ bake(architecture);for(const piece of hideable)bake(piece);
  // Movable objects. Each is merged locally so 24 players can share a rich room.
  const modelCache=new Map();
  function propModel(type){if(modelCache.has(type))return cloneModel(modelCache.get(type));const g=new THREE.Group();g.userData.type=type;if(propTypes[type]?.model)inventoryModel(type,g);
@@ -220,7 +225,21 @@ for(const [x,z,w,d] of walls){if(x===14){box(.3,.58,36,14,.29,0);box(.3,.3,36,14
  function animateEffects(now){for(let i=revealEffects.length-1;i>=0;i--){const fx=revealEffects[i],age=(now-fx.start)/1000;if(age>=1.5){clearEffect(fx);revealEffects.splice(i,1);continue;}const k=age/1.5;fx.material.opacity=.9*(1-k);fx.ring.scale.setScalar(1+age*(reducedMotion?.5:2.2));for(const piece of fx.pieces){piece.position.copy(piece.userData.start).addScaledVector(piece.userData.velocity,reducedMotion?age*.15:age);piece.position.y=Math.max(.05,piece.position.y-age*age*1.8);piece.rotation.set(age*3,age*2,age);piece.scale.multiplyScalar(.994);}if(fx.silhouette){fx.silhouette.position.y=age*.25;fx.silhouette.scale.setScalar(1+Math.sin(Math.min(1,age*3)*Math.PI)*.12);}}}
  function sync(state,myId){currentState=state;currentId=myId;if(!state)return;for(const effect of state.effects||[])addEffect(effect,state.now-effect.at);updateObjects(state.objects||initialProps);const visibleIds=new Set();for(const p of state.players||[]){const team=p.role||p.team;if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||p.status==='found'||p.propId)continue;visibleIds.add(p.id);let g=people.get(p.id);if(g&&g.userData.team!==team){scene.remove(g);people.delete(p.id);g=null;}if(!g){g=avatar(team);g.position.set(p.x,p.y||0,p.z);people.set(p.id,g);}g.userData.target=new THREE.Vector3(p.x,p.y||0,p.z);g.userData.angle=p.yaw||0;g.visible=p.id!==myId;}for(const[id,g]of people)if(!visibleIds.has(id))g.visible=false;for(const shot of state.shots||[])addShot(shot);}
  const tempVec=new THREE.Vector3(),cameraTarget=new THREE.Vector3(),focus=new THREE.Vector3();
- function render(state,myId,yaw,pitch,active,entered,t=performance.now()){const dt=Math.min(.06,Math.max(.001,(t-lastTime)/1000));lastTime=t;currentState=state;currentId=myId;own=state?.players?.find(p=>p.id===myId)||null;
+ // Kamera ile kılık arasında kalan duvar, tavan paneli veya mobilya o kare boyunca gizlenir:
+ // kamera istediği yerde durur, arada ne varsa yokmuş gibi davranır.
+ const hidden=[];
+ const showAll=()=>{for(const g of hidden)g.visible=true;hidden.length=0;};
+ function hideOccluders(from,to,mine){
+  tempVec.copy(to).sub(from);const span=tempVec.length();if(span<.25)return;
+  cameraRay.set(from,tempVec.normalize());cameraRay.far=span-.15;
+  for(const hit of cameraRay.intersectObjects([...hideable,...objectModels.values()],true)){
+   if(hit.object.material===contactMat)continue;
+   let g=hit.object;while(g&&g.parent!==shell&&!g.userData.objectId)g=g.parent;
+   if(!g||g===mine||!g.visible)continue;
+   g.visible=false;hidden.push(g);
+  }
+ }
+ function render(state,myId,yaw,pitch,active,entered,t=performance.now()){showAll();const dt=Math.min(.06,Math.max(.001,(t-lastTime)/1000));lastTime=t;currentState=state;currentId=myId;own=state?.players?.find(p=>p.id===myId)||null;
  const mix=1-Math.exp(-dt*17);for(const g of objectModels.values()){if(g.userData.target){g.position.lerp(g.userData.target,mix);g.rotation.y+=Math.atan2(Math.sin(g.userData.angle-g.rotation.y),Math.cos(g.userData.angle-g.rotation.y))*mix;}}
  for(const [id,g]of people){if(g.userData.target){const speed=g.position.distanceTo(g.userData.target);g.position.lerp(g.userData.target,mix);g.rotation.y=g.userData.angle;g.userData.limbs?.forEach((l,i)=>l.rotation.x=speed>.015?Math.sin(t*.009+(i%2)*Math.PI)*.38:0);g.visible=g.visible&&id!==myId;}}
  const playing=active&&own&&Number.isFinite(own.x)&&Number.isFinite(own.z);recoil=Math.max(0,recoil-dt*5.4);
@@ -234,32 +253,20 @@ for(const [x,z,w,d] of walls){if(x===14){box(.3,.58,36,14,.29,0);box(.3,.3,36,14
   // zorlanınca duvarın içine girip arkasını gösteriyordu. Bu yüzden önce istenen yön denenir,
   // olmazsa odaya bakan en açık yön taranır; hiçbir yön yetmiyorsa kamera nesnenin içine geçip
   // oyuncunun baktığı yöne bakar. Tarama yalnızca sabit mimariye ışın atar, ucuzdur.
-  const statics=[architecture,...collisionMeshes];
-  const movables=[...objectModels.values()].filter(g=>g!==myObject);
-  const aim=(y,p)=>new THREE.Vector3(0,0,1).applyEuler(new THREE.Euler(Math.max(-.75,Math.min(.32,p))-.16,y,0,'YXZ'));
-  const openness=(dir,list,far)=>{cameraRay.set(cameraTarget,dir);cameraRay.far=far;const h=cameraRay.intersectObjects(list,true).find(x=>x.object.material!==contactMat);return h?h.distance:far;};
-  const enough=Math.min(distance,1.5);
-  let chosen=aim(yaw,pitch),room=openness(chosen,statics,distance);
-  if(room<enough)search:for(const dy of [.55,-.55,1.1,-1.1,1.7,-1.7,2.4,-2.4,Math.PI]){
-   for(const dp of [0,-.35]){
-    const dir=aim(yaw+dy,pitch+dp),got=openness(dir,statics,distance);
-    if(got>room){room=got;chosen=dir;}
-    if(room>=enough)break search;
-   }
-  }
-  const reach=Math.min(distance,openness(chosen,[...statics,...movables],Math.min(distance,room)));
-  const place=Math.max(.5,reach-.18);
   if(myObject)myObject.visible=true;
-  const desired=cameraTarget.clone().addScaledVector(chosen,place);
+  const chosen=new THREE.Vector3(0,0,1).applyEuler(new THREE.Euler(Math.max(-.75,Math.min(.32,pitch))-.16,yaw,0,'YXZ'));
+  const desired=cameraTarget.clone().addScaledVector(chosen,distance);
   // Yükseğe asılı kılıklarda (duvardaki tablo, tavandaki lamba) kamera daha geriden ve daha
   // aşağıdan bakar, böylece ekranı tavan değil oda doldurur; alçak kılıklarda hafif yukarıdan.
-  const rise=highUp>0?-Math.min(1.35,highUp*.85+.25):.5*Math.min(1,place/distance);
+  const rise=highUp>0?-Math.min(1.35,highUp*.85+.25):.5;
   desired.y=Math.max(.55,Math.min(ROOM.height-.75,desired.y+rise));
+  desired.x=Math.max(-24,Math.min(24,desired.x));desired.z=Math.max(-26,Math.min(26,desired.z));
   if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*24));
   // Yükseğe asılı kılıkta tam nesneye bakmak kareyi tavanla doldurur; bakış noktası biraz aşağı
   // alınınca hem kılık üstte görünür hem oda görünür kalır.
   focus.copy(cameraTarget);if(highUp>0)focus.y-=Math.min(1.25,highUp*.85);
   camera.lookAt(focus);
+  hideOccluders(camera.position,cameraTarget,myObject);
   const body=people.get(myId);if(body)body.visible=!myObject&&own.status!=='found';gun.visible=false;}
  else{const desired=pos.clone().add(new THREE.Vector3(0,1.64,0));if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*27));camera.rotation.set(Math.max(-1.35,Math.min(1.35,pitch)),yaw,0,'YXZ');gun.visible=!!entered&&own.status!=='found';gun.position.set(.32,-.31+Math.sin(t*.002)*.003,-.53+recoil*.085);gun.rotation.set(recoil*.16,0,-recoil*.07);const fill=Math.max(.02,Math.min(1,(own.ammo??100)/100));waterFill.scale.y=fill;waterFill.position.y=.148+.065*fill;}}
  else{gun.visible=false;camera.position.set(-11.9,1.9,8.8);camera.lookAt(-5.5,.75,3.8);}

@@ -52,6 +52,18 @@ export const zones=[
 export function zoneAt(x,z){return zones.find(zone=>x>=zone.xmin&&x<=zone.xmax&&z>=zone.zmin&&z<=zone.zmax)||null;}
 // Out in the hallway no room theme applies, so any everyday type is fair game there. Signature
 // pieces (the painting, the log table) are deliberately excluded: they exist exactly once a round.
+// Yazılı yerleşimden her tipin nerede durduğunu çıkarır: yerde mi, bir mobilyanın üstünde/içinde
+// mi, yoksa duvara asılı mı. Q ile dönüşüm bunu kullanır; yerde duran bir oyuncu koltuk minderine
+// veya tabağa dönüşmez, masadaki bir oyuncu da lambadere dönüşmez.
+export const typeHomes=new Map();
+for(const o of fixtures){
+ const t=propTypes[o.type];if(!t)continue;
+ const kind=t.mounted?'mounted':o.supportId?'support':'floor';
+ if(!typeHomes.has(o.type))typeHomes.set(o.type,new Set());
+ typeHomes.get(o.type).add(kind);
+}
+export const homeKind=o=>propTypes[o.type]?.mounted?'mounted':(o.supportId||(o.y||0)>.35)?'support':'floor';
+export const fitsHome=(type,kind)=>{const homes=typeHomes.get(type);return !homes||homes.has(kind);};
 export const commonTypes=[...new Set(zones.flatMap(zone=>zone.types))];
 // Room settings can dial the total object count up or down; each room keeps its share of the total.
 export const DEFAULT_PROP_COUNT=zones.reduce((sum,zone)=>sum+zone.count,0);

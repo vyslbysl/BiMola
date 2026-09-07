@@ -1,6 +1,6 @@
 import {assembly,moveAssembly,detachChildren,settleObjects} from './public/physics.js';
 import {randomUUID} from 'node:crypto';
-import {free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,contains} from './public/world.js';
+import {free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,contains,homeKind,fitsHome} from './public/world.js';
 export {dist};
 export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPEED=4.3,ESCAPE_SPEED=HUNTER_SPEED*2;
 // Hiders can hop onto counters, tables and beds: JUMP_SPEED clears the 1 m kitchen counter with
@@ -109,7 +109,10 @@ export function shuffle(r,p){
  const zone=zoneAt(o.x,o.z);const pool=[...new Set([...(zone?.types||commonTypes),...fixtures.filter(q=>!zone||zoneAt(q.x,q.z)?.id===zone.id).map(q=>q.type)])];
  const attached=new Set(assembly(r.objects,o).map(q=>q.id));const candidates=pool.filter(type=>{const q={...o,type},t=propTypes[type];return type!==o.type&&!blocksDoor(q)&&free(o.x,o.z,t.radius,r.objects,o.id,o.y||0,t.height,q,attached);});
  if(!candidates.length)return {ok:false,error:'Burada başka bir nesneye yer yok. Biraz açık alana geç.'};
- detachChildren(r.objects,o);delete o.supportId;o.anchored=false;o.type=candidates[Math.floor(Math.random()*candidates.length)];p.changes--;return {ok:true,type:o.type,changes:p.changes};
+ // Bulunduğun yere yakışan tiplere daral: yerdeysen yerde duran eşyalara, bir yüzeyin üstündeysen
+ // orada durabilecek eşyalara dönüşürsün. Uygun tip yoksa eski davranışa düşer.
+ const kind=homeKind(o),suitable=candidates.filter(type=>fitsHome(type,kind)),pick=suitable.length?suitable:candidates;
+ detachChildren(r.objects,o);delete o.supportId;o.anchored=false;o.type=pick[Math.floor(Math.random()*pick.length)];p.changes--;return {ok:true,type:o.type,changes:p.changes};
 }
 export function decoy(r,p,now=Date.now()){
  if(!p||!['prep','play'].includes(r.phase)||p.team!=='hider'||p.status!=='alive'||!p.propId)return {ok:false,error:'Kopyayı bir nesneyken bırakabilirsin.'};

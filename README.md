@@ -39,7 +39,7 @@ Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm,
 | WASD / oklar | Hareket |
 | Fare | Bakış ve kamera (tur boyunca fare imleci oyuna kilitlenir) |
 | E | İlk nesneyi seç (3D önizlemeli panel) |
-| Q | Odaya uygun rastgele nesneye değiş (3 hak) |
+| Q | Odaya ve bulunduğun yere uygun rastgele nesneye değiş (3 hak) — yerdeyken yerde duran eşyalara, bir yüzeydeyken yüzeyde duran eşyalara |
 | C | Sahte kopya bırak (saklanma süresinde de olur, turda 3 hak, isabet alana kadar kalır) |
 | Z / X | Nesnenin yönünü çevir |
 | Fare tekerleği / PgUp · PgDn | Kılığı yükselt · indir (sıradan eşya en fazla 2,2 m; duvara asılı parçalar 3,4 m). Koltuğa gömülü bir minder gibi eşyalar kaldırılırken bir sonraki boş yüksekliğe çıkar |
@@ -49,7 +49,7 @@ Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm,
 | R | Su deposunu doldur |
 | Esc | Fareyi serbest bırak ve menüyü aç — fare serbest kalır, ekrana tıklayınca oyun geri alır |
 
-Saklanan dönüşünce kendi nesnesini her zaman üçüncü şahıs kameradan görür. Kamera, istenen yönde yer yoksa (duvara dayalı bir nesnenin arkası gibi) odaya bakan en açık yöne kayar, böylece duvarın arkası görünmez. Duvardaki tablo veya tavandaki lamba gibi yükseğe asılı kılıklarda daha geriden ve daha aşağıdan bakar, bakış noktası da nesnenin biraz altına iner; böylece ekranı tavan değil oda doldurur. Avcı birinci şahıs kamerayla su tabancası taşır. Tur sırasında fare imleci her iki tarafta da oyuna kilitlenir; imleç ancak nesne seçme paneli veya bir menü açıkken serbest kalır. Tarayıcı fare kilidini desteklemiyorsa sürükleyerek bakılabilir; Boşluk ile ateş edilebilir. Dokunmatik yön ve ateş düğmeleri de bulunur; ana oynanış masaüstü için tasarlanmıştır.
+Saklanan dönüşünce kendi nesnesini her zaman üçüncü şahıs kameradan görür. Kamera baktığın yöne gider; arada kalan duvar, cam cephe, üst silme, tavan paneli veya mobilya o kare boyunca gizlenir, yani duvarın arkasına geçmesi gerektiğinde duvar yokmuş gibi davranır. Duvardaki tablo veya tavandaki lamba gibi yükseğe asılı kılıklarda daha geriden ve daha aşağıdan bakar, bakış noktası da nesnenin biraz altına iner; böylece ekranı tavan değil oda doldurur. Avcı birinci şahıs kamerayla su tabancası taşır. Tur sırasında fare imleci her iki tarafta da oyuna kilitlenir; imleç ancak nesne seçme paneli veya bir menü açıkken serbest kalır. Tarayıcı fare kilidini desteklemiyorsa sürükleyerek bakılabilir; Boşluk ile ateş edilebilir. Dokunmatik yön ve ateş düğmeleri de bulunur; ana oynanış masaüstü için tasarlanmıştır.
 
 ## Docker
 
