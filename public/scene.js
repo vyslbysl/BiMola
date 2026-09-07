@@ -224,7 +224,51 @@ for(const [x,z,w,d] of walls){if(x===14){box(.3,.58,36,14,.29,0);box(.3,.3,36,14
  const mix=1-Math.exp(-dt*17);for(const g of objectModels.values()){if(g.userData.target){g.position.lerp(g.userData.target,mix);g.rotation.y+=Math.atan2(Math.sin(g.userData.angle-g.rotation.y),Math.cos(g.userData.angle-g.rotation.y))*mix;}}
  for(const [id,g]of people){if(g.userData.target){const speed=g.position.distanceTo(g.userData.target);g.position.lerp(g.userData.target,mix);g.rotation.y=g.userData.angle;g.userData.limbs?.forEach((l,i)=>l.rotation.x=speed>.015?Math.sin(t*.009+(i%2)*Math.PI)*.38:0);g.visible=g.visible&&id!==myId;}}
  const playing=active&&own&&Number.isFinite(own.x)&&Number.isFinite(own.z);recoil=Math.max(0,recoil-dt*5.4);
- if(playing){const isHider=(own.role||own.team)==='hider';const myObject=own.propId?objectModels.get(own.propId):null;const pos=myObject?myObject.position:people.get(myId)?.position||new THREE.Vector3(own.x,own.y||0,own.z);if(isHider){const ph=myObject?(propTypes[myObject.userData.type]?.height||.8):1.7;cameraTarget.copy(pos).add(new THREE.Vector3(0,Math.min(1.25,ph*.64+.17),0));const size=myObject?dimensions({type:myObject.userData.type}):null;const distance=myObject?Math.max(2.5,Math.hypot(size.w,size.d)*.75,(size.h||0)*1.25):3.2;const direction=new THREE.Vector3(0,0,1).applyEuler(new THREE.Euler(Math.max(-.75,Math.min(.32,pitch))-.16,yaw,0,'YXZ'));const desired=cameraTarget.clone().addScaledVector(direction,distance);desired.y=Math.max(.55,Math.min(ROOM.height-.75,desired.y+.5));tempVec.copy(desired).sub(cameraTarget);const full=tempVec.length();cameraRay.set(cameraTarget,tempVec.normalize());cameraRay.far=full;const hit=cameraRay.intersectObjects([architecture,...collisionMeshes,...[...objectModels.values()].filter(g=>g!==myObject)],true).find(h=>h.object.material!==contactMat);if(hit)desired.copy(cameraTarget).addScaledVector(tempVec,Math.max(.16,hit.distance-.16));if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*24));camera.lookAt(cameraTarget);const body=people.get(myId);if(body)body.visible=!myObject&&own.status!=='found';gun.visible=false;}
+ if(playing){const isHider=(own.role||own.team)==='hider';const myObject=own.propId?objectModels.get(own.propId):null;const pos=myObject?myObject.position:people.get(myId)?.position||new THREE.Vector3(own.x,own.y||0,own.z);if(isHider){
+  const ph=myObject?(propTypes[myObject.userData.type]?.height||.8):1.7;
+  cameraTarget.copy(pos).add(new THREE.Vector3(0,Math.min(1.25,ph*.64+.17),0));
+  const size=myObject?dimensions({type:myObject.userData.type}):null;
+  const distance=myObject?Math.max(2.5,Math.hypot(size.w,size.d)*.75,(size.h||0)*1.25):3.2;
+  // Duvardaki tablo veya tavandaki lamba olduğunda istenen yönde kameraya yer yok: oraya
+  // zorlanınca duvarın içine girip arkasını gösteriyordu. Bu yüzden önce istenen yön denenir,
+  // olmazsa odaya bakan en açık yön taranır; hiçbir yön yetmiyorsa kamera nesnenin içine geçip
+  // oyuncunun baktığı yöne bakar. Tarama yalnızca sabit mimariye ışın atar, ucuzdur.
+  const statics=[architecture,...collisionMeshes];
+  const movables=[...objectModels.values()].filter(g=>g!==myObject);
+  const aim=(y,p)=>new THREE.Vector3(0,0,1).applyEuler(new THREE.Euler(Math.max(-.75,Math.min(.32,p))-.16,y,0,'YXZ'));
+  const openness=(dir,list,far)=>{cameraRay.set(cameraTarget,dir);cameraRay.far=far;const h=cameraRay.intersectObjects(list,true).find(x=>x.object.material!==contactMat);return h?h.distance:far;};
+  const enough=Math.min(distance,1.5);
+  let chosen=aim(yaw,pitch),room=openness(chosen,statics,distance);
+  if(room<enough)search:for(const dy of [.55,-.55,1.1,-1.1,1.7,-1.7,2.4,-2.4,Math.PI]){
+   for(const dp of [0,-.35]){
+    const dir=aim(yaw+dy,pitch+dp),got=openness(dir,statics,distance);
+    if(got>room){room=got;chosen=dir;}
+    if(room>=enough)break search;
+   }
+  }
+  const reach=Math.min(distance,openness(chosen,[...statics,...movables],Math.min(distance,room)));
+  const place=reach-.18;
+  // Yükseğe asılı bir kılıkta (duvardaki tablo, tavandaki lamba) kendine bakmak ekranı tavanla
+  // doldurur; sıkışmış bir kılıkta ise kamera duvarın içine girer. Bu iki durumda kamera nesnenin
+  // içine geçip oyuncunun baktığı yöne, yani odaya bakar. Kendi kılığı o an gizlenir, böylece
+  // görüntüyü kapatmaz; diğer oyuncular nesneyi görmeye devam eder.
+  const inside=(place<.55||cameraTarget.y>1.9)&&own.status==='alive';
+  if(inside){
+   // Yüksekteki bir kılık doğal olarak odaya doğru, yani hafif aşağı bakar; oyuncu isterse
+   // fareyle yukarı çevirebilir.
+   const droop=Math.min(.5,Math.max(0,cameraTarget.y-1.9)*.35);
+   camera.position.copy(cameraTarget);
+   camera.rotation.set(Math.max(-1.2,Math.min(1.2,pitch-droop)),yaw,0,'YXZ');
+   if(myObject)myObject.visible=false;
+   wasPlaying=true;
+  }else{
+   if(myObject)myObject.visible=true;
+   const desired=cameraTarget.clone().addScaledVector(chosen,place);
+   desired.y=Math.max(.55,Math.min(ROOM.height-.75,desired.y+.5*Math.min(1,place/distance)));
+   if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*24));
+   camera.lookAt(cameraTarget);
+  }
+  const body=people.get(myId);if(body)body.visible=!myObject&&own.status!=='found';gun.visible=false;}
  else{const desired=pos.clone().add(new THREE.Vector3(0,1.64,0));if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*27));camera.rotation.set(Math.max(-1.35,Math.min(1.35,pitch)),yaw,0,'YXZ');gun.visible=!!entered&&own.status!=='found';gun.position.set(.32,-.31+Math.sin(t*.002)*.003,-.53+recoil*.085);gun.rotation.set(recoil*.16,0,-recoil*.07);const fill=Math.max(.02,Math.min(1,(own.ammo??100)/100));waterFill.scale.y=fill;waterFill.position.y=.148+.065*fill;}}
  else{gun.visible=false;camera.position.set(-11.9,1.9,8.8);camera.lookAt(-5.5,.75,3.8);}
  wasPlaying=!!playing;for(let i=shots.length-1;i>=0;i--){const shot=shots[i],age=(performance.now()-shot.start)/1000;shot.streak.visible=age<.15;shot.streak.material.opacity=Math.max(0,.65-age*4);for(const p of shot.g.children){if(!p.userData.velocity)continue;p.position.addScaledVector(p.userData.velocity,dt);p.userData.velocity.y-=dt*4;p.scale.multiplyScalar(.97);}if(age>.5){scene.remove(shot.g);shot.streak.geometry.dispose();shot.streak.material.dispose();shots.splice(i,1);}}
