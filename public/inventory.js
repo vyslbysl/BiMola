@@ -48,7 +48,8 @@ define('knife','Mutfak bıçağı','knife',.34,.03,.06);
 define('smallPot','Küçük saksı','smallPot',.26,.23,.26);
 define('tableLamp','Masa lambası','tableLamp',.29,.42,.29);
 define('floorLamp','Lambader','floorLamp',.8,1.86,.58);
-define('pendant','Sarkıt lamba','pendant',1.04,.8,1.04);
+// mounted: duvara veya tavana asılı parçalar. Yerçekimine kapılmazlar, yükseklikleriyle kalırlar.
+define('pendant','Sarkıt lamba','pendant',1.04,.8,1.04,{mounted:true});
 define('largePlant','Büyük saksı bitkisi','largePlant',1.35,2.35,1.35);
 define('book','Kitap','book',.3,.32,.058);
 define('flatBook','Masa kitabı','flatBook',.42,.075,.56);
@@ -56,11 +57,11 @@ define('seatPillow','Koltuk minderi','seatPillow',.49,.46,.2);
 define('bedPillow','Yatak yastığı','bedPillow',.58,.18,.4);
 define('throw','Koltuk şalı','throw',.55,.05,1.3);
 define('blanket','Yatak örtüsü','blanket',1.95,.055,.9);
-define('wallArt','Duvar tablosu','wallArt',2.3,2.6,.08);
-define('wallShelf','Duvar rafı','wallShelf',7.5,.065,.36,{large:true});
+define('wallArt','Duvar tablosu','wallArt',2.3,2.6,.08,{mounted:true});
+define('wallShelf','Duvar rafı','wallShelf',7.5,.065,.36,{large:true,mounted:true});
 define('rugLiving','Salon halısı','rug',7.25,.018,8.1,{large:true,flat:true});
 define('rugGarden','Kış bahçesi halısı','rug',5.7,.018,5.4,{large:true,flat:true});
-define('curtain','Perde','curtain',.24,2.72,.52,{large:true});
+define('curtain','Perde','curtain',.24,2.72,.52,{large:true,mounted:true});
 export const fixtures=[];
 function add(id,type,x,y,z,parentId=null,angle=0,anchored=false){
  const parent=parentId?fixtures.find(o=>o.id===parentId):null;

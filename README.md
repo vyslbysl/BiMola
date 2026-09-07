@@ -42,10 +42,10 @@ Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm,
 | Q | Odaya uygun rastgele nesneye değiş (3 hak) |
 | C | Sahte kopya bırak (saklanma süresinde de olur, turda 3 hak, isabet alana kadar kalır) |
 | Z / X | Nesnenin yönünü çevir |
-| Fare tekerleği / PgUp · PgDn | Kılığı yükselt · indir (rafa kaldırıp bırakabilirsin) |
-| Boşluk (saklanan) | Zıpla — tezgaha, masaya, yatağa çık |
+| Fare tekerleği / PgUp · PgDn | Kılığı yükselt · indir (sıradan eşya en fazla 2,2 m; duvara asılı parçalar 3,4 m) |
+| Boşluk | Zıpla — saklanan tezgaha ve masaya çıkar, avcı yüksek rafların üstünü görmek için zıplar |
 | F | Konumu sabitle / serbest bırak |
-| Sol tık / Boşluk (avcı) | Su sık |
+| Sol tık | Su sık |
 | R | Su deposunu doldur |
 | Esc | Fareyi serbest bırak ve menüyü aç — fare serbest kalır, ekrana tıklayınca oyun geri alır |
 
@@ -74,6 +74,8 @@ Oda ve tur durumu bellektedir, sunucu yeniden başlayınca silinir. Hesap/kalıc
 ## Kış bahçesi, sahte kopyalar ve görsel geri bildirim
 
 Doğudaki eski giriş/vitrin odası artık oturma alanı, okuma sehpası, bank ve bitki bakım tezgâhıyla kış bahçesidir. Sabit mobilyaların çarpışma alanları sunucuyla ortaktır; rastgele eşyalar oda temasına göre üretilir.
+
+Duvara asılı parçalar (tablo, perde, duvar rafı, sarkıt lamba) kılık olarak alındığında duvarda kalır: yana kaydırılabilir, yükseltilip indirilebilir ama düşmez. Sıradan eşyaların kaldırılabileceği en yüksek nokta 2,2 m'dir; zıplayan bir avcının göz hizası 2,8 m'ye ulaştığı için orada bırakılan nesne görülebilir kalır.
 
 Saklananlar bir nesneyken ve yere basarken C veya ekrandaki Sahte kopya düğmesiyle bulundukları yerde aynı görünümde bir kopya bırakabilir; bu saklanma süresinde de yapılabilir, avın başlamasını beklemek gerekmez. Turda üç hak vardır; Q dönüşüm haklarından bağımsızdır. Kopyalar zaman aşımına uğramaz. Tek su isabetinde parçacık animasyonuyla kaybolur; asıl oyuncunun su miktarını değiştirmez. Kopyaya dönüşülemez, yeni tur tüm kopyaları temizler.
 

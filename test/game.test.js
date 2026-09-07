@@ -206,3 +206,20 @@ test('a disguise can be raised and lowered, is capped, and settles when let go',
  pinned.p.locked=true;pinned.p.input={lift:1};pinned.p.inputAt=20000;tick(pinned.r,20000,.05);
  assert.equal(pinned.p.y,0,'F ile sabitlenmişken yükselmez');
 });
+
+test('duvara asılı bir kılık düşmez, avcı da zıplayabilir',()=>{
+ const r=play(room());const p=r.players.b,h=r.players.a;
+ const art={id:'art',type:'wallArt',x:-13.75,y:.95,z:5,angle:Math.PI/2,wet:0};
+ r.objects=[art];p.x=art.x;p.z=art.z;p.y=0;
+ assert.ok(possess(r,p,art.id).ok,'tablo kılığına girilebilir');
+ assert.equal(p.y,.95,'kılığı alınca tablonun yüksekliğine geçer');
+ for(let t=20000;t<20800;t+=50){p.input={x:0,z:1};p.inputAt=t;tick(r,t,.05);}
+ assert.ok(Math.abs(art.y-.95)<.02,`tablo duvarda kaldı (${art.y.toFixed(2)} m)`);
+ assert.equal(p.grounded,true,'asılı kılık yere basmış sayılır, kopya bırakabilir');
+ // Avcı da zıplayabiliyor: yüksek rafa bırakılan nesneyi görebilmesi için.
+ h.x=0;h.z=6;h.y=0;h.vy=0;h.grounded=true;
+ h.input={jump:true};h.inputAt=21000;tick(r,21000,.05);
+ assert.ok(h.vy>0&&h.y>0,'avcı zıpladı');
+ for(let t=21050;t<22200;t+=50){h.input={};h.inputAt=t;tick(r,t,.05);}
+ assert.equal(h.y,0,'ve yere indi');
+});

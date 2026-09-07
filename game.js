@@ -8,7 +8,10 @@ export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPE
 // disguise can be turned on the spot, in radians per second.
 // LIFT_SPEED, kılığı yukarı aşağı taşıma hızı; LIFT_MAX en yüksek rafın (2,6 m) üstüne
 // bırakmaya yetecek kadar, tavana kadar değil.
-export const GRAVITY=18,JUMP_SPEED=6.6,SPIN_SPEED=2.4,LIFT_SPEED=1.4,LIFT_MAX=2.9;
+// Sıradan bir kılık en fazla LIFT_MAX'e çıkar: zıplayan bir avcının göz hizası 2,8 m'ye ulaştığı
+// için orada bırakılan nesne görülebilir kalır. Duvara asılı parçalar (tablo, perde, duvar rafı)
+// LIFT_MAX_MOUNTED'e kadar çıkar; onlar duvarda durması beklenen, göz alıcı parçalar.
+export const GRAVITY=18,JUMP_SPEED=6.6,SPIN_SPEED=2.4,LIFT_SPEED=1.4,LIFT_MAX=2.2,LIFT_MAX_MOUNTED=3.4;
 export const defaultSettings={teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:DEFAULT_PROP_COUNT};
 const teams=['hunter','hider'];
 const integer=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)))):fallback;
@@ -231,15 +234,19 @@ export function tick(r,now,dt){
   // rafın üstüne kaldırılıp orada bırakılabilir. Tuş bırakılınca nesne desteğine oturur.
   // Kaldırmaya başlamak, halı gibi yerine sabitlenmiş bir kılığı da serbest bırakır.
   const lift=Math.max(-1,Math.min(1,Number(p.input.lift)||0));
+  const mounted=!!(o&&propTypes[o.type]?.mounted);
   if(o&&lift&&!p.locked&&p.team==='hider'){o.anchored=false;delete o.supportId;}
-  if(p.team==='hider'&&!o?.anchored){
+  if(!o?.anchored){
    const parent=r.objects.find(q=>q.id===o?.supportId);
    const ground=parent?(parent.y||0)+(propTypes[parent.type].surface??propTypes[parent.type].height):surfaceHeight(p.x,p.z,Math.max(STAND_MAX_HEIGHT,p.y+.08),r.objects,p.propId);
-   if(o&&lift&&!p.locked){
-    const target=Math.max(ground,Math.min(LIFT_MAX,p.y+lift*LIFT_SPEED*dt));
+   if(o&&lift&&!p.locked&&p.team==='hider'){
+    const target=Math.max(mounted?0:ground,Math.min(mounted?LIFT_MAX_MOUNTED:LIFT_MAX,p.y+lift*LIFT_SPEED*dt));
     const delta=target-p.y,steps=Math.max(1,Math.ceil(Math.abs(delta)/.06)),inc=delta/steps;
     for(let i=0;i<steps;i++){if(!attempt(p.x,p.z,p.y+inc))break;delete o.supportId;o.anchored=false;}
     p.vy=0;p.grounded=p.y<=ground+.005;
+   }else if(mounted){
+    // Asılı bir kılık duvarda kalır: yana kaydırılsa da düşmez.
+    p.vy=0;p.grounded=true;
    }else{
     if(p.input.jump&&p.grounded&&!p.locked){p.vy=JUMP_SPEED;if(o)delete o.supportId;}
     p.vy-=GRAVITY*dt;const ny=Math.max(ground,p.y+p.vy*dt);
