@@ -20,7 +20,8 @@ npm start
 - 10–60 saniye saklanma; 1–10 dakika tur.
 - Oyuncular takım seçebilir veya otomatik dağıtılır.
 - Oda sahibi lobide bot ekler/çıkarır, insanları taşır, kapasite ve süreleri değiştirir.
-- İki takım da seçilen kapasiteye ulaşınca tur başlar. Yeni turda takımlar yer değiştirir.
+- Tur, her iki tarafta en az bir kişi varsa başlar: takımların eşit olması gerekmez, 1'e 1 de olur. Takım başına seçilen sayı yalnızca üst sınırdır. Yeni turda takımlar yer değiştirir.
+- Oda kodu 4 haneli bir sayıdır; davet bağlantısı kodu hazır getirir.
 - Oda sahibi ayrılırsa yetki kalan bir insana geçer. Son insan ayrılınca oda silinir.
 
 ## Oynanış

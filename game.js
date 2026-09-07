@@ -64,7 +64,8 @@ export function setTeam(r,id,team,actor=id){
 }
 export function start(r,now=Date.now()){
  r.settings=sanitizeSettings(r.settings);syncBots(r);
- if(teams.some(team=>count(r,team)!==r.settings.teamSize))return {error:`Başlamak için her takımda ${r.settings.teamSize} kişi olmalı. Botlarla doldurmayı açabilirsin.`};
+ // Takımların eşit olması gerekmiyor: her tarafta en az bir kişi varsa tur başlar.
+ if(teams.some(team=>count(r,team)<1))return {error:'Başlamak için en az bir saklanan ve bir avcı olmalı. Takım seç veya bot ekle.'};
  if((r.round||0)>0&&r.settings.swapTeams){for(const p of Object.values(r.players))p.team=p.role=p.team==='hunter'?'hider':'hunter';[r.settings.hunterBots,r.settings.hiderBots]=[r.settings.hiderBots,r.settings.hunterBots];}
  r.round=(r.round||0)+1;r.phase='prep';r.until=now+r.settings.hideSeconds*1000;r.winner=null;r.reason=null;r.shots=[];r.effects=[];r.results=[];r.events=[];r.objects=generateProps(r.settings.objectCount);r.initialObjects=r.objects.map(o=>({...o}));
  let h=0,k=0;const spawned=[];

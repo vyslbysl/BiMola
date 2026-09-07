@@ -24,10 +24,15 @@ test('host settings sanitize bounds, preserve humans and reject non-host mutatio
  assert.equal(sanitizeSettings({teamSize:500}).teamSize,12);assert.equal(sanitizeSettings({teamSize:-2}).teamSize,1);
  r.phase='play';assert.ok(configureRoom(r,{roundSeconds:300},'a').error);
 });
-test('custom bots obey per-team counts and incomplete teams cannot start',()=>{
+test('custom bots obey per-team counts; only an empty side blocks the round',()=>{
  const r=room();r.phase='lobby';assert.ok(configureRoom(r,{teamSize:3,botMode:'custom',hunterBots:1,hiderBots:2},'a').ok);
- assert.equal(Object.values(r.players).filter(p=>p.bot&&p.team==='hunter').length,1);assert.equal(Object.values(r.players).filter(p=>p.bot&&p.team==='hider').length,2);assert.ok(start(r,30000).error);
- assert.ok(configureRoom(r,{hunterBots:2},'a').ok);assert.ok(start(r,30000).ok);
+ assert.equal(Object.values(r.players).filter(p=>p.bot&&p.team==='hunter').length,1);assert.equal(Object.values(r.players).filter(p=>p.bot&&p.team==='hider').length,2);
+ assert.ok(start(r,30000).ok,'2 avcıya 3 saklanan da başlar, eşitlik şartı yok');
+ // Bir tarafta kimse yoksa tur başlamaz.
+ const solo=room();solo.phase='lobby';assert.ok(configureRoom(solo,{teamSize:2,botMode:'off'},'a').ok);
+ solo.players.a.team=solo.players.a.role='hider';syncBots(solo);
+ assert.ok(start(solo,30000).error,'avcı yoksa başlamaz');
+ r.phase='end';assert.ok(configureRoom(r,{hunterBots:2},'a').ok);assert.ok(start(r,40000).ok);
  r.phase='end';assert.ok(configureRoom(r,{teamSize:1,botMode:'custom',hunterBots:1},'a').error);
 });
 test('human team changes replace fill bots, with host-only moves of another player',()=>{
