@@ -40,3 +40,15 @@ test('practice brief has no timer until ready and six versus six has visible rep
   await delay(400);const practice=await a.emitWithAck('join',{name:'Ada',practice:true,role:'hunter'});const pr=g.rooms.get(practice.code);assert.equal(pr.phase,'brief');assert.equal(pr.until,0);await delay(100);assert.equal(pr.phase,'brief');assert.ok((await a.emitWithAck('ready')).ok);assert.equal(pr.phase,'prep');assert.ok(pr.until>Date.now());
  }finally{a?.disconnect();b?.disconnect();g.close();}
 });
+test('different map rooms keep their own packets and serve all map assets',{timeout:12000},async()=>{
+ const {g,url}=await setup();let a,b;
+ try{
+  a=await connect(url);b=await connect(url);
+  const pa=wait(a,'state'),pb=wait(b,'state');
+  const first=await a.emitWithAck('join',{name:'Pazar',practice:true,settings:{mapId:'market'}});
+  const second=await b.emitWithAck('join',{name:'Sera',practice:true,settings:{mapId:'greenhouse'}});
+  const [sa,sb]=await Promise.all([pa,pb]);assert.equal(sa.settings.mapId,'market');assert.equal(sb.settings.mapId,'greenhouse');assert.notEqual(first.code,second.code);
+  assert.ok(sa.objects.some(o=>o.type==='marketStall'));assert.ok(sb.objects.some(o=>o.type==='planterBox'));assert.ok(!sb.objects.some(o=>o.type==='marketStall'));
+  for(const path of ['/maps.js','/map-models.js','/maps/references/market.jpeg','/maps/references/greenhouse.jpeg','/maps/references/arcade.jpeg','/maps/references/museum.jpeg','/maps/references/hotel.jpeg','/maps/references/loft.jpeg']){const response=await fetch(url+path,{method:'HEAD'});assert.equal(response.status,200,path);}
+ }finally{a?.disconnect();b?.disconnect();g.close();}
+});

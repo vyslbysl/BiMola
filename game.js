@@ -1,6 +1,7 @@
+import {validMap} from './public/maps.js';
 import {assembly,moveAssembly,detachChildren,settleObjects} from './public/physics.js';
 import {randomUUID} from 'node:crypto';
-import {free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,DEFAULT_DECOR,MIN_DECOR,MAX_DECOR,contains,homeKind,fitsHome} from './public/world.js';
+import {mapFor,groundAt,free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,DEFAULT_DECOR,MIN_DECOR,MAX_DECOR,contains,homeKind,fitsHome} from './public/world.js';
 export {dist};
 // Kaç isabetin bir saklananı ortaya çıkardığı ve ıslanan saklananın kaçış hızı artık oda
 // ayarıdır; buradaki değerler yalnızca varsayılan.
@@ -16,13 +17,14 @@ export const DEFAULT_HITS=3,MIN_HITS=1,MAX_HITS=10,DEFAULT_ESCAPE=1.1,MIN_ESCAPE
 // için orada bırakılan nesne görülebilir kalır. Duvara asılı parçalar (tablo, perde, duvar rafı)
 // LIFT_MAX_MOUNTED'e kadar çıkar; onlar duvarda durması beklenen, göz alıcı parçalar.
 export const GRAVITY=18,JUMP_SPEED=6.6,SPIN_SPEED=2.4,LIFT_SPEED=1.4,LIFT_MAX=2.2,LIFT_MAX_MOUNTED=3.4;
-export const defaultSettings={teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:DEFAULT_PROP_COUNT,decor:DEFAULT_DECOR,idleReveal:DEFAULT_IDLE,revealHits:DEFAULT_HITS,escapeBoost:DEFAULT_ESCAPE};
+export const defaultSettings={mapId:'loft',teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:DEFAULT_PROP_COUNT,decor:DEFAULT_DECOR,idleReveal:DEFAULT_IDLE,revealHits:DEFAULT_HITS,escapeBoost:DEFAULT_ESCAPE};
 const teams=['hunter','hider'];
 const integer=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)))):fallback;
 const decimal=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)*20)/20)):fallback;
 export function sanitizeSettings(input={},previous=defaultSettings){
  input=input&&typeof input==='object'?input:{};
  const settings={...defaultSettings,...previous};
+ if(validMap(input.mapId))settings.mapId=input.mapId;
  if('teamSize'in input)settings.teamSize=integer(input.teamSize,1,12,settings.teamSize);
  if(['off','fill','custom'].includes(input.botMode))settings.botMode=input.botMode;
  for(const key of ['hunterBots','hiderBots'])settings[key]=integer(input[key]??settings[key],0,settings.teamSize,0);
@@ -82,7 +84,7 @@ export function start(r,now=Date.now()){
  // Takımların eşit olması gerekmiyor: her tarafta en az bir kişi varsa tur başlar.
  if(teams.some(team=>count(r,team)<1))return {error:'Başlamak için en az bir saklanan ve bir avcı olmalı. Takım seç veya bot ekle.'};
  if((r.round||0)>0&&r.settings.swapTeams){for(const p of Object.values(r.players))p.team=p.role=p.team==='hunter'?'hider':'hunter';[r.settings.hunterBots,r.settings.hiderBots]=[r.settings.hiderBots,r.settings.hunterBots];}
- r.round=(r.round||0)+1;r.phase='prep';r.until=now+r.settings.hideSeconds*1000;r.winner=null;r.reason=null;r.shots=[];r.effects=[];r.results=[];r.events=[];r.objects=generateProps(r.settings.objectCount,r.settings.decor);
+ r.round=(r.round||0)+1;r.phase='prep';r.until=now+r.settings.hideSeconds*1000;r.winner=null;r.reason=null;r.shots=[];r.effects=[];r.results=[];r.events=[];r.objects=generateProps(r.settings.objectCount,r.settings.decor,r.settings.mapId);
  for(const p of Object.values(r.players)){p.stillSpot=null;p.stillAt=now;p.leakAt=0;p.exposedUntil=0;}r.initialObjects=r.objects.map(o=>({...o}));
  let h=0,k=0;const spawned=[];
  for(const p of Object.values(r.players)){
@@ -90,15 +92,15 @@ export function start(r,now=Date.now()){
   // Hiders start spread around the rooms, one room after another, so everybody opens the round with
   // something within reach. Hunters keep their huddle in the hallway, where they wait out the count.
   if(p.team==='hider'){
-   const zone=zones[i%zones.length];
+   const mapZones=mapFor(r.objects).zones,zone=mapZones[i%mapZones.length];
    for(let a=0;a<160;a++){
     const px=zone.xmin+PLACEMENT_PAD+Math.random()*Math.max(.2,zone.xmax-zone.xmin-2*PLACEMENT_PAD);
     const pz=zone.zmin+PLACEMENT_PAD+Math.random()*Math.max(.2,zone.zmax-zone.zmin-2*PLACEMENT_PAD);
-    if(free(px,pz,.28,r.objects)&&!spawned.some(q=>dist({x:px,z:pz},q)<.9)){x=px;z=pz;break;}
+    if(free(px,pz,.28,r.objects,null,groundAt(px,pz,r.objects))&&!spawned.some(q=>dist({x:px,z:pz},q)<.9)){x=px;z=pz;break;}
    }
   }
-  if(!free(x,z,.28,r.objects)||spawned.some(q=>dist({x,z},q)<.65)){const base={x,z};search:for(let radius=.75;radius<6;radius+=.75)for(let j=0;j<16;j++){const px=base.x+Math.cos(j*Math.PI/8)*radius,pz=base.z+Math.sin(j*Math.PI/8)*radius;if(free(px,pz,.28,r.objects)&&!spawned.some(q=>dist({x:px,z:pz},q)<.65)){x=px;z=pz;break search;}}}spawned.push({x,z});
-  Object.assign(p,{role:p.team,x,z,y:0,vy:0,grounded:true,yaw:p.team==='hunter'?Math.PI:0,pitch:0,status:'alive',input:{},inputAt:now,propId:null,water:0,changes:3,decoys:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0,goal:null,botTarget:null,botTargetUntil:0,botScanned:new Set(),botBurstUntil:0,lastProgressAt:now,lastProgress:{x,z}});
+  if(!free(x,z,.28,r.objects,null,groundAt(x,z,r.objects))||spawned.some(q=>dist({x,z},q)<.65)){const base={x,z};search:for(let radius=.75;radius<6;radius+=.75)for(let j=0;j<16;j++){const px=base.x+Math.cos(j*Math.PI/8)*radius,pz=base.z+Math.sin(j*Math.PI/8)*radius;if(free(px,pz,.28,r.objects,null,groundAt(px,pz,r.objects))&&!spawned.some(q=>dist({x:px,z:pz},q)<.65)){x=px;z=pz;break search;}}}spawned.push({x,z});
+  Object.assign(p,{role:p.team,x,z,y:groundAt(x,z,r.objects),vy:0,grounded:true,yaw:p.team==='hunter'?Math.PI:0,pitch:0,status:'alive',input:{},inputAt:now,propId:null,water:0,changes:3,decoys:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0,goal:null,botTarget:null,botTargetUntil:0,botScanned:new Set(),botBurstUntil:0,lastProgressAt:now,lastProgress:{x,z}});
  }
  return {ok:true};
 }
@@ -117,12 +119,15 @@ export function shuffle(r,p){
  const o=r.objects.find(o=>o.id===p.propId&&o.owner===p.id);if(!o)return {ok:false,error:'Nesne bulunamadı.'};
  // Stay on-theme for whatever room the object is currently in (a kitchen mug shouldn't turn into a
  // suitcase); out in the hallway, where no room theme applies, any type is still fair game.
- const zone=zoneAt(o.x,o.z);const pool=[...new Set([...(zone?.types||commonTypes),...fixtures.filter(q=>!zone||zoneAt(q.x,q.z)?.id===zone.id).map(q=>q.type)])];
+ const zone=zoneAt(o.x,o.z,r.objects);const pool=[...new Set([...(zone?.types||mapFor(r.objects).zones.flatMap(z=>z.types)),...mapFor(r.objects).fixtures.filter(q=>!zone||zoneAt(q.x,q.z,r.objects)?.id===zone.id).map(q=>q.type)])];
  const attached=new Set(assembly(r.objects,o).map(q=>q.id));const candidates=pool.filter(type=>{const q={...o,type},t=propTypes[type];return type!==o.type&&!blocksDoor(q)&&free(o.x,o.z,t.radius,r.objects,o.id,o.y||0,t.height,q,attached);});
  if(!candidates.length)return {ok:false,error:'Burada başka bir nesneye yer yok. Biraz açık alana geç.'};
  // Bulunduğun yere yakışan tiplere daral: yerdeysen yerde duran eşyalara, bir yüzeyin üstündeysen
  // orada durabilecek eşyalara dönüşürsün. Uygun tip yoksa eski davranışa düşer.
- const kind=homeKind(o),suitable=candidates.filter(type=>fitsHome(type,kind)),pick=suitable.length?suitable:candidates;
+ // Yakışan bir tip yoksa rastgele bir şeye dönüşmek yerine dönüşüm reddedilir: yerde duran bir
+ // kılığın tabağa, tabaktan yastığa dönüşmesi oyunu saçmalaştırıyordu. Hak da harcanmaz.
+ const kind=homeKind(o),pick=candidates.filter(type=>fitsHome(type,kind));
+ if(!pick.length)return {ok:false,error:'Bulunduğun yere yakışan başka bir eşya yok. Biraz açık alana geç.'};
  detachChildren(r.objects,o);delete o.supportId;o.anchored=false;o.type=pick[Math.floor(Math.random()*pick.length)];p.changes--;return {ok:true,type:o.type,changes:p.changes};
 }
 export function decoy(r,p,now=Date.now()){
@@ -132,7 +137,7 @@ export function decoy(r,p,now=Date.now()){
  if(!source||!p.grounded)return {ok:false,error:'Kopyayı yere bastığında bırak.'};
  if(blocksDoor(source))return {ok:false,error:'Kopyayı kapı geçişinden uzağa bırak.'};
  const group=assembly(r.objects,source),rootId=randomUUID(),ids=new Map(group.map(q=>[q.id,q===source?rootId:randomUUID()]));
- for(const q of group)r.objects.push({id:ids.get(q.id),type:q.type,x:q.x,y:q.y||0,z:q.z,angle:q.angle,wet:q.wet,decoyOf:source.id,decoyRoot:rootId,...(ids.has(q.supportId)?{supportId:ids.get(q.supportId)}:{})});
+ for(const q of group)r.objects.push({id:ids.get(q.id),mapId:r.settings.mapId,type:q.type,x:q.x,y:q.y||0,z:q.z,angle:q.angle,wet:q.wet,decoyOf:source.id,decoyRoot:rootId,...(ids.has(q.supportId)?{supportId:ids.get(q.supportId)}:{})});
  p.decoys--;p.locked=false;
  return {ok:true,decoys:p.decoys};
 }
@@ -196,7 +201,7 @@ export function shoot(r,p,now=Date.now()){
 function autoHide(r,p){
  const choices=r.objects.filter(o=>!o.owner&&!o.decoyOf&&o.wet<100);
  if(!choices.length)return;
- const visible=choices.filter(o=>sight(p,o));visible.sort((a,b)=>dist(p,a)-dist(p,b));
+ const visible=choices.filter(o=>sight(p,o,r.objects));visible.sort((a,b)=>dist(p,a)-dist(p,b));
  const o=p.bot?choices[Math.floor(Math.random()*choices.length)]:(visible[0]||choices.sort((a,b)=>dist(p,a)-dist(p,b))[0]);bindProp(p,o);p.locked=true;
 }
 function botInput(r,p,now){
@@ -208,7 +213,7 @@ function botInput(r,p,now){
   if(target)p.botScanned.add(target.id);
   const candidates=r.objects.filter(o=>o.wet<100&&!p.botScanned.has(o.id));
   if(!candidates.length){p.botScanned.clear();p.botTarget=null;p.input={};return;}
-  const nearby=candidates.filter(o=>sight(p,o)&&dist(p,o)<12);
+  const nearby=candidates.filter(o=>sight(p,o,r.objects)&&dist(p,o)<12);
   const pool=nearby.length?nearby:candidates;target=pool[Math.floor(Math.random()*pool.length)];p.botTarget=target.id;p.botTargetUntil=now+14000;p.pathAt=0;
  }
  const dx=target.x-p.x,dz=target.z-p.z,d=Math.hypot(dx,dz),y=(target.y||0)+propTypes[target.type].height*.5;
@@ -220,8 +225,8 @@ function botInput(r,p,now){
  while(p.path.length&&dist(p,p.path[0])<.5)p.path.shift();const waypoint=p.path[0]||target;
  let x=waypoint.x-p.x,z=waypoint.z-p.z,len=Math.hypot(x,z);if(len>.1){x/=len;z/=len;}
  // A short local detour keeps static props from trapping a grid path follower.
- if(!free(p.x+x*.65,p.z+z*.65,.28,r.objects)){
-  const alternatives=[{x:-z,z:x},{x:z,z:-x},{x:1,z:0},{x:-1,z:0},{x:0,z:1},{x:0,z:-1}].filter(v=>free(p.x+v.x*.65,p.z+v.z*.65,.28,r.objects));
+ if(!free(p.x+x*.65,p.z+z*.65,.28,r.objects,null,groundAt(p.x+x*.65,p.z+z*.65,r.objects))){
+  const alternatives=[{x:-z,z:x},{x:z,z:-x},{x:1,z:0},{x:-1,z:0},{x:0,z:1},{x:0,z:-1}].filter(v=>free(p.x+v.x*.65,p.z+v.z*.65,.28,r.objects,null,groundAt(p.x+v.x*.65,p.z+v.z*.65,r.objects)));
   alternatives.sort((a,b)=>dist({x:p.x+a.x,z:p.z+a.z},waypoint)-dist({x:p.x+b.x,z:p.z+b.z},waypoint));
   if(alternatives.length){x=alternatives[0].x;z=alternatives[0].z;}else{x=z=0;}
  }
@@ -245,6 +250,8 @@ export function tick(r,now,dt){
   const tall=o?propTypes[o.type].height:BODY_HEIGHT;
   let x=Number(p.input.x)||0,z=Number(p.input.z)||0,len=Math.hypot(x,z);
   const attempt=(nx,nz,ny=p.y,angle=o?.angle||0)=>{
+   const floor=groundAt(nx,nz,r.objects),oldFloor=groundAt(p.x,p.z,r.objects);
+   if(p.grounded&&Math.abs(p.y-oldFloor)<.15&&Math.abs(floor-oldFloor)<.15)ny=Math.max(floor,ny+floor-oldFloor);
    if(o){const moved=moveAssembly(r,o,{x:nx,z:nz,y:ny,angle});if(moved){p.x=o.x;p.z=o.z;p.y=o.y;}return moved;}
    if(!free(nx,nz,radius,r.objects,null,ny,tall))return false;p.x=nx;p.z=nz;p.y=ny;return true;
   };
@@ -264,9 +271,9 @@ export function tick(r,now,dt){
    const parent=r.objects.find(q=>q.id===o?.supportId);
    const ground=parent?(parent.y||0)+(propTypes[parent.type].surface??propTypes[parent.type].height):surfaceHeight(p.x,p.z,Math.max(STAND_MAX_HEIGHT,p.y+.08),r.objects,p.propId);
    if(o&&lift&&!p.locked&&p.team==='hider'){
-    const target=Math.max(mounted?0:ground,Math.min(mounted?LIFT_MAX_MOUNTED:LIFT_MAX,p.y+lift*LIFT_SPEED*dt));
+    const target=Math.max(mounted?0:ground,Math.min(groundAt(p.x,p.z,r.objects)+(mounted?LIFT_MAX_MOUNTED:LIFT_MAX),p.y+lift*LIFT_SPEED*dt));
     const delta=target-p.y,steps=Math.max(1,Math.ceil(Math.abs(delta)/.06)),inc=delta/steps;
-    const ceiling=mounted?LIFT_MAX_MOUNTED:LIFT_MAX;
+    const ceiling=groundAt(p.x,p.z,r.objects)+(mounted?LIFT_MAX_MOUNTED:LIFT_MAX);
     for(let i=0;i<steps;i++){
      if(attempt(p.x,p.z,p.y+inc)){delete o.supportId;o.anchored=false;continue;}
      // Koltuğa gömülü bir minder aradaki yüksekliklere sığmaz; küçük adım engellenirse bir
@@ -316,11 +323,11 @@ export function view(r,id,now=Date.now()){
  const packet={code:r.code,host:r.host,phase:r.phase,until:r.until||0,now,round:r.round||0,settings:r.settings,practice:!!r.practice,winner:r.winner,reason:r.reason,spectating:spectator?.id,
   players:Object.values(r.players).map(p=>{
    const own=p.id===id,teammate=p.team===me.team,transformed=!!p.propId;
-   const visible=own||inMatch&&!blind&&(teammate||!transformed&&p.status==='alive'&&dist(eye,p)<35&&sight(eye,p));
+   const visible=own||inMatch&&!blind&&(teammate||!transformed&&p.status==='alive'&&(me.status==='found'||dist(eye,p)<35&&sight(eye,p,r.objects)));
    return {id:p.id,name:p.name,bot:p.bot,team:p.team,role:p.team,status:p.status,visible:!!visible,...(visible?{x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch}:{}),...((own||teammate)&&inMatch?{propId:p.propId}:{}),...(own?{water:p.water,changes:p.changes,decoys:p.decoys,locked:p.locked,ammo:p.ammo,reloadUntil:p.reloadUntil,exposed:p.exposedUntil>now,stillFor:p.stillAt?Math.round((now-p.stillAt)/1000):0}:{} )};
   }),
   objects:inMatch?objects.map(({id,type,x,y,z,angle,wet})=>({id,type,x,y:y||0,z,angle,wet})):[],
-  effects:blind?[]:(r.effects||[]).filter(e=>now-e.at<1800&&dist(eye,e)<35&&(e.kind!=='idle'||me.team==='hunter'||e.owner===id)),
+  effects:blind?[]:(r.effects||[]).filter(e=>now-e.at<1800&&(me.status==='found'||dist(eye,e)<35)&&(e.kind!=='idle'||me.team==='hunter'||e.owner===id)),
   shots:blind?[]:(r.shots||[]).filter(s=>now-s.at<650),events:blind?[]:(r.events||[]).filter(e=>now-e.at<4500)
  };
  if(me.team==='hider'&&!me.propId&&['prep','play'].includes(r.phase))packet.nearby=(r.objects||[]).filter(o=>accessibleObject(r,me,o.id)).map(o=>({id:o.id,type:o.type,y:o.y||0,distance:objectDistance(me,o)})).sort((a,b)=>a.distance-b.distance);

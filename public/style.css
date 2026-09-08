@@ -24,3 +24,12 @@ dialog,.lobby-panel,.result-panel,.brief-card{border-color:#ffffffcc;background:
 #prop-search{width:96px;border:1px solid var(--line);background:#fffdf7;border-radius:6px;padding:4px 7px;font-size:10px;color:var(--ink)}
 #nearby-props{max-height:none}
 #picker{max-width:min(720px,94vw)}
+
+/* Compact spectator controls leave the room visible after the reveal animation. */
+#found-card{top:auto;bottom:25px;transform:translateX(-50%);width:min(480px,94vw);padding:14px 18px;backdrop-filter:blur(12px)}
+#found-card:not(.hidden){animation:none}#found-card strong{font-size:13px;color:var(--blue)}#found-card small{display:block;font-size:10px;line-height:1.6;margin-top:9px;color:var(--muted)}
+.spectator-buttons{display:flex;justify-content:center;gap:8px}#found-card button{margin-top:9px;min-height:36px}.spectator-touch{display:none}
+body.spectating .hud-bottom .controls,body.spectating .meter,body.spectating #crosshair,body.spectating #touch-fire,body.spectating #touch-jump{display:none!important}
+@media(max-width:800px){body.spectating #touch-controls{bottom:175px}.spectator-touch{display:flex;gap:8px;justify-content:center}#found-card{bottom:15px}}
+
+.map-selector{margin:18px 0 22px}.map-preview{position:relative;margin:10px 0 0;height:210px;border-radius:8px;overflow:hidden;background:#d4dcd5}.map-preview img{width:100%;height:100%;object-fit:cover}.map-preview figcaption{position:absolute;inset:auto 0 0;padding:30px 16px 12px;background:linear-gradient(transparent,#172e36e8);color:white}.map-preview strong{display:block;font-size:20px}.map-preview span{display:block;font-size:11px;line-height:1.6;margin-top:4px}.map-preview small{display:block;opacity:.7;font-size:8px;margin-top:6px}#map-id:focus-visible,#quick-map:focus-visible{outline:2px solid var(--blue);outline-offset:3px}@media(max-width:600px){.map-preview{height:165px}.map-preview strong{font-size:17px}}

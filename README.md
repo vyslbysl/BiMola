@@ -13,6 +13,18 @@ npm start
 
 [Oyunu aç](http://localhost:3000). **Hemen oyna**, seçtiğin tarafta 3'e 3 botlu antrenman açar. Hazırım düğmesine basmadan süre başlamaz. **Kendi odanı kur** ile özel oda oluşturulur.
 
+## Haritalar
+
+**Kendi odanı kur → Harita** bölümünden seçim yapılır. **Hemen oyna** ekranında da harita seçilerek botlarla denenebilir. Oda sahibi haritayı lobide veya tur bitiminde değiştirebilir; devam eden tur sırasında değiştiremez. Mevcut Güneşli Ev korunur.
+
+- **Kıyı Pazarı:** çizgili tenteli tezgâhlar, meyve kasaları, çeşmeli meydan ve kahve köşesi.
+- **Çatı Serası:** cam sera, bitki kasaları, bakım masaları ve çatı terası. Cam suyu durdurur; görüşü kesmez. Kuzey, güney ve yan çıkışlar vardır.
+- **Son Jeton:** arcade ve pinball makineleri, langırt, çamaşırhane ve kahve tezgâhı.
+- **Minik Mucitler:** güneş sistemi sergisi, robot ve deney masaları, kitaplıklar; iki rampayla çıkılan 3 m yüksekliğinde üst galeri.
+- **Bavul Molası:** resepsiyon, bagaj alanı, oturma salonu ve dekoratif su avlusu. Avlu geçilebilir; yüzme mekaniği yoktur.
+
+Her haritanın mimarisi, nesne havuzu ve bot yolları ayrıdır. Eşya değişimi, kopyalar, isabet ve yoğunluk ayarları ortak çalışır. Yeni haritalarda 21 yeni eşya türü bulunur; büyük nesnelerin üzerindeki küçük eşyalar bağımsız seçilir. Müzedeki yükseltme sınırı bulunulan katın zemininden ölçülür. Gönderilen görsellerden palet, malzeme ve yerleşim fikri alınmıştır; sahneler gerçek zamanlı geometriyle yeniden kurulmuştur, fotoğrafların birebir 3D kopyası değildir.
+
 ## Oda ayarları
 
 - Takım başına 1–12 kişi: 1'e 1, 3'e 3, 5'e 5, 6'ya 6, 12'ye 12.
@@ -38,6 +50,14 @@ Aynı yerde çakılıp kalmak artık bedava değil: oda ayarındaki süre boyunc
 **Avcı:** Sol fare tuşuna veya Boşluk'a basılı tutarak su sık. Doğru nişan ve görüş gerekir; duvarlar, mobilyalar ve öndeki nesneler suyu keser. **Sıradan bir eşyaya tek atış yeter:** ilk isabette tamamen ıslanır ve "gerçek eşya" olarak işaretlenir, üstüne depo boşaltmaya gerek yoktur. Saklanan bir oyuncu ise oda ayarına göre ıslanır — varsayılan 3 isabette, yani her atışta %34 — ve ancak %100'e ulaştığında açığa çıkıp elenir. Depo 25 atış alır; R ile 2 saniyede dolar.
 
 Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm, can puanı, silahlı çatışma, kaçış görevleri veya yetenek kartları yoktur.
+
+## Yakalanınca izleme
+
+Yakalanan oyuncu serbest kameraya geçer. **WASD / oklar** ile dolaşır, fareyle bakar, **Boşluk** ile yükselir, **C** ile alçalır ve **Shift** ile hızlanır. Kamera oda sınırları içinde, iç duvarların ve eşyaların arasından geçebilir. **V** serbest kamera ile yaşayan takım arkadaşını izleme arasında geçiş yapar; **Q / E** önceki / sonraki takım arkadaşını seçer. Ekrandaki düğmeler ve mobil yüksel/alçal kontrolleri de aynı işi yapar. İzlenen oyuncu yakalanırsa sıradaki yaşayan takım arkadaşı seçilir; kimse kalmadığında serbest kameraya dönülür ve tur sonucu gösterilir.
+
+İzleyici hareketi sunucuya oyuncu hareketi olarak gönderilmez. Yakalanan oyuncu eşya seçemez, kopya bırakamaz veya ateş edemez. Canlı oyuncuların görüş ve hazırlık gizliliği korunur. Yeni tur ve odadan çıkış kamera tercihini sıfırlar.
+
+Beş yeni haritanın tasarım planı ve Higgsfield üretim durumları: [Alternatif haritalar](design/map-concepts/README.md). Beş alternatif harita artık oda ayarlarında ve hızlı oyunda seçilebilir. Konsept görselleri harita seçiminin referans önizlemeleridir; oyun içi ekran görüntüsü değildir.
 
 ## Kontroller
 

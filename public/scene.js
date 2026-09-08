@@ -1,6 +1,8 @@
+import {buildMapProp,buildMapArchitecture} from './map-models.js';
 import * as THREE from '/vendor/three.module.js';
+import {moveSpectator} from './spectator.js';
 import {installHiggsfieldMaterials} from './materials.js';
-import {ROOM,walls,props as initialProps,propTypes,dimensions,objectDistance,hitParts} from './world.js';
+import {mapFor,wallBoxes,terrainBoxes,ROOM,walls,props as initialProps,propTypes,dimensions,objectDistance,hitParts} from './world.js';
 
 // Every game object and its disguise share these models. No second, telltale silhouette.
 export function createScene(container){
@@ -31,6 +33,8 @@ export function createScene(container){
  const mat=(color,opts={})=>new THREE.MeshStandardMaterial({color,roughness:.7,...opts});
  const m={oak:mat('#ffffff',{map:timber,roughness:.5,bumpMap:timber,bumpScale:.009}),floor:mat('#e7d3b3',{map:oak,roughness:.53,bumpMap:oak,bumpScale:.028}),wall:mat('#f8f4e8',{map:plaster,bumpMap:plaster,bumpScale:.01,roughness:.92}),white:mat('#f5f1e8',{roughness:.4}),cream:mat('#efe4ce',{map:linen,bumpMap:linen,bumpScale:.008}),terracotta:mat('#c1805e',{map:linen,bumpMap:linen,bumpScale:.008}),teal:mat('#457b79',{roughness:.4}),orange:mat('#f5a947',{roughness:.4}),rattan:mat('#ffffff',{map:woven,bumpMap:woven,bumpScale:.018}),stone:mat('#f6f2e7',{map:terrazzo,bumpMap:terrazzo,bumpScale:.003,roughness:.38}),brass:mat('#b1a07a',{metalness:.78,roughness:.3}),metal:mat('#c2c7bd',{metalness:.83,roughness:.25}),black:mat('#353b37',{roughness:.68}),rubber:mat('#28312e',{roughness:.9}),soil:mat('#3c3326',{roughness:1}),leaf:mat('#426b38',{roughness:.65,side:THREE.DoubleSide}),leafLight:mat('#73954a',{roughness:.68,side:THREE.DoubleSide}),leafDark:mat('#2e5631',{roughness:.75,side:THREE.DoubleSide}),paper:mat('#e8dfcc'),navy:mat('#415564'),pink:mat('#c09182'),blue:mat('#7fa3ae'),water:mat('#31bce4',{roughness:.1,metalness:.1,transparent:true,opacity:.77}),glass:mat('#d7f1ea',{transparent:true,opacity:.18,roughness:.12,metalness:.2,depthWrite:false}),rug:mat('#fff8e9',{map:rugMap,roughness:1,bumpMap:rugMap,bumpScale:.01})};
 
+ const screenMap=canvasTexture(256,256,(ctx,w,h)=>{ctx.fillStyle='#172e4d';ctx.fillRect(0,0,w,h);for(let i=0;i<70;i++){ctx.fillStyle=['#e6b960','#77a5b1','#e99b85'][i%3];ctx.fillRect(rand()*w,rand()*h,2,2);}for(let i=0;i<5;i++){ctx.strokeStyle=['#d99677','#8bb5a9'][i%2];ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(128,128,30+i*18,20+i*10,-.35,0,Math.PI*2);ctx.stroke();}});
+ const mapMaterials={awning:mat('#87afb4'),cobalt:mat('#344d77'),yellow:mat('#ead586'),coral:mat('#d88c74'),screen:mat('#ffffff',{map:screenMap,emissive:'#5d88a2',emissiveMap:screenMap,emissiveIntensity:.25,roughness:.35}),marquee:mat('#e0b761',{emissive:'#b77d38',emissiveIntensity:.15}),glow:mat('#e4b6dc',{emissive:'#c58faf',emissiveIntensity:.35}),window:mat('#cbdde1',{emissive:'#b4d0d7',emissiveIntensity:.28}),skyline:mat('#bac3c4'),sea:mat('#78adb9',{roughness:.35})};
  // Material roles are shared by movable props and furniture, so disguises stay visually identical.
  m.sage=mat('#8b9f94',{roughness:.72});
  m.clay=mat('#ae7154',{roughness:.79});
@@ -145,7 +149,7 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  if(f.type==='nightstand'){round(w,h-.09,d,.03,0,(h-.09)/2+.09,0,m.oak,g);round(w-.06,.16,d-.05,.02,0,h-.19,.015,m.white,g);rod([-.07,h-.19,d/2+.005],[.07,h-.19,d/2+.005],.011,m.brass,g);for(const x of [-1,1])for(const z of [-1,1])rod([x*(w/2-.06),.09,z*(d/2-.06)],[x*(w/2-.04),.01,z*(d/2-.04)],.018,m.oak,g);}
  if(f.type==='wardrobe'){box(w,h,d,0,h/2,0,m.oak,g);for(const sign of [-1,1]){box(.025,h-.16,d/2-.06,w/2+.005,h/2,sign*d/4,m.cream,g);rod([w/2+.02,h*.52,sign*d/4],[w/2+.02,h*.52-.16,sign*d/4],.016,m.brass,g);}}
  }
- function inventoryModel(type,g){const t=propTypes[type],model=t.model;
+ function inventoryModel(type,g){const t=propTypes[type],model=t.model;if(buildMapProp(mapContext,model,g))return;
  if(model==='furniture'){furnitureModel(t.f,g);return;}
  if(model==='chair'){chair(0,0,0,g);return;}
  if(model==='officeChair'){round(.65,.1,.6,.05,0,.48,0,m.teal,g);round(.62,.58,.085,.05,0,.82,.25,m.teal,g);cyl(.045,.045,.42,0,.24,0,m.metal,g);for(let i=0;i<5;i++){const a=i*Math.PI*2/5;rod([0,.13,0],[Math.cos(a)*.31,.07,Math.sin(a)*.31],.022,m.metal,g);sphere(.045,Math.cos(a)*.31,.045,Math.sin(a)*.31,m.black,g);}return;}
@@ -176,6 +180,21 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  // The entrance has a generous arch-like frame, a panelled oak door and small glazing.
  box(3.1,3.6,.13,0,1.8,17.78,m.oak);for(const side of [-1,1]){box(1.32,3.34,.08,side*.72,1.73,17.68,m.white);box(1.15,2.25,.045,side*.72,2.19,17.62,m.glass).castShadow=false;rod([side*.19,1.05,17.55],[side*.19,1.4,17.55],.021,m.brass);}
  bake(architecture);for(const piece of hideable)bake(piece);
+ const mapContext={THREE,box,round,cyl,sphere,torus,rod,plant,m,mapMaterials,shellPiece,bake};
+ const loftPieces=[...hideable];let activeMap='loft',mapArchitecture=null,currentRoom=ROOM;
+ function useMap(id='loft'){
+  const map=mapFor(id);if(map.id===activeMap)return;showAll();
+  if(mapArchitecture){scene.remove(mapArchitecture);mapArchitecture.traverse(o=>{if(o.isMesh)o.geometry.dispose();});mapArchitecture=null;}
+  for(const piece of hideable)if(!loftPieces.includes(piece)){shell.remove(piece);piece.traverse(o=>{if(o.isMesh)o.geometry.dispose();});}
+  hideable.length=0;loftPieces.forEach(p=>p.visible=map.id==='loft');
+  architecture.visible=outside.visible=map.id==='loft';
+  if(map.id==='loft')hideable.push(...loftPieces);else{mapArchitecture=buildMapArchitecture(mapContext,map);scene.add(mapArchitecture);}
+  currentRoom=map.room;activeMap=map.id;wasPlaying=false;
+  for(const g of objectModels.values()){scene.remove(g);disposeModel(g);}objectModels.clear();
+  for(const mesh of collisionMeshes)mesh.geometry.dispose();collisionMeshes.length=0;
+  for(const {x,z,w,d,h,y}of [...wallBoxes(map.id),...terrainBoxes(map.id)]){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),collisionMaterial);mesh.position.set(x,y+h/2,z);mesh.updateMatrixWorld();collisionMeshes.push(mesh);}
+  sun.position.set(map.id==='greenhouse'?20:26,map.id==='museum'?32:22,5);renderer.shadowMap.needsUpdate=true;
+ }
  // Movable objects. Each is merged locally so 24 players can share a rich room.
  const modelCache=new Map();
  function propModel(type){if(modelCache.has(type))return cloneModel(modelCache.get(type));const g=new THREE.Group();g.userData.type=type;if(propTypes[type]?.model)inventoryModel(type,g);
@@ -257,7 +276,7 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  }
  function clearEffect(fx){scene.remove(fx.g);fx.material.dispose();fx.silhouette?.children.forEach(o=>o.geometry.dispose());}
  function animateEffects(now){for(let i=revealEffects.length-1;i>=0;i--){const fx=revealEffects[i],age=(now-fx.start)/1000;if(age>=1.5){clearEffect(fx);revealEffects.splice(i,1);continue;}const k=age/1.5;fx.material.opacity=.9*(1-k);fx.ring.scale.setScalar(1+age*(fx.spread??(reducedMotion?.5:2.2)));for(const piece of fx.pieces){piece.position.copy(piece.userData.start).addScaledVector(piece.userData.velocity,reducedMotion?age*.15:age);piece.position.y=Math.max(.05,piece.position.y-age*age*1.8);piece.rotation.set(age*3,age*2,age);piece.scale.multiplyScalar(.994);}if(fx.silhouette){fx.silhouette.position.y=age*.25;fx.silhouette.scale.setScalar(1+Math.sin(Math.min(1,age*3)*Math.PI)*.12);}}}
- function sync(state,myId){currentState=state;currentId=myId;if(!state)return;for(const effect of state.effects||[])addEffect(effect,state.now-effect.at);updateObjects(state.objects||initialProps);const visibleIds=new Set();for(const p of state.players||[]){const team=p.role||p.team;if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||p.status==='found'||p.propId)continue;visibleIds.add(p.id);let g=people.get(p.id);if(g&&g.userData.team!==team){scene.remove(g);people.delete(p.id);g=null;}if(!g){g=avatar(team);g.position.set(p.x,p.y||0,p.z);people.set(p.id,g);}g.userData.target=new THREE.Vector3(p.x,p.y||0,p.z);g.userData.angle=p.yaw||0;g.visible=p.id!==myId;}for(const[id,g]of people)if(!visibleIds.has(id))g.visible=false;for(const shot of state.shots||[])addShot(shot);}
+ function sync(state,myId){currentState=state;currentId=myId;if(!state)return;useMap(state.settings?.mapId||'loft');for(const effect of state.effects||[])addEffect(effect,state.now-effect.at);updateObjects(state.objects?.length?state.objects:mapFor(state.settings?.mapId||'loft').fixtures);const visibleIds=new Set();for(const p of state.players||[]){const team=p.role||p.team;if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||p.status==='found'||p.propId)continue;visibleIds.add(p.id);let g=people.get(p.id);if(g&&g.userData.team!==team){scene.remove(g);people.delete(p.id);g=null;}if(!g){g=avatar(team);g.position.set(p.x,p.y||0,p.z);people.set(p.id,g);}g.userData.target=new THREE.Vector3(p.x,p.y||0,p.z);g.userData.angle=p.yaw||0;g.visible=p.id!==myId;}for(const[id,g]of people)if(!visibleIds.has(id))g.visible=false;for(const shot of state.shots||[])addShot(shot);}
  const tempVec=new THREE.Vector3(),cameraTarget=new THREE.Vector3(),focus=new THREE.Vector3();
  let frameCount=0,frameSum=0,frameTicks=0;
  // Kamera ile kılık arasında kalan duvar, tavan paneli veya mobilya o kare boyunca gizlenir:
@@ -274,14 +293,32 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
    g.visible=false;hidden.push(g);
   }
  }
- function render(state,myId,yaw,pitch,active,entered,t=performance.now()){
+ function render(state,myId,yaw,pitch,active,entered,t=performance.now(),spectator={}){
  const refreshOccluders=(++frameCount)%occluderEvery===0;if(refreshOccluders)showAll();
  if(renderer.shadowMap.enabled&&frameCount%shadowEvery===0)renderer.shadowMap.needsUpdate=true;
  const dt=Math.min(.06,Math.max(.001,(t-lastTime)/1000));lastTime=t;currentState=state;currentId=myId;own=state?.players?.find(p=>p.id===myId)||null;
  const mix=1-Math.exp(-dt*17);for(const g of objectModels.values()){if(g.userData.target){g.position.lerp(g.userData.target,mix);g.rotation.y+=Math.atan2(Math.sin(g.userData.angle-g.rotation.y),Math.cos(g.userData.angle-g.rotation.y))*mix;}}
  for(const [id,g]of people){if(g.userData.target){const speed=g.position.distanceTo(g.userData.target);g.position.lerp(g.userData.target,mix);g.rotation.y=g.userData.angle;g.userData.limbs?.forEach((l,i)=>l.rotation.x=speed>.015?Math.sin(t*.009+(i%2)*Math.PI)*.38:0);g.visible=g.visible&&id!==myId;}}
  const playing=active&&own&&Number.isFinite(own.x)&&Number.isFinite(own.z);recoil=Math.max(0,recoil-dt*5.4);
- if(playing){const isHider=(own.role||own.team)==='hider';const myObject=own.propId?objectModels.get(own.propId):null;const pos=myObject?myObject.position:people.get(myId)?.position||new THREE.Vector3(own.x,own.y||0,own.z);if(isHider){
+ if(playing&&own.status==='found'){
+  showAll();gun.visible=false;
+  const target=state.players.find(p=>p.id===spectator.targetId&&p.status==='alive');
+  if(spectator.mode==='follow'&&target){
+   const object=target.propId?objectModels.get(target.propId):null;
+   const pos=object?.position||people.get(target.id)?.position||new THREE.Vector3(target.x,target.y||0,target.z);
+   const height=object?(propTypes[object.userData.type]?.height||1):1.7;
+   cameraTarget.copy(pos).add(new THREE.Vector3(0,Math.min(1.5,height*.65),0));
+   const size=object?dimensions({type:object.userData.type}):null;
+   const distance=size?Math.max(3,Math.hypot(size.w,size.d)*.85,size.h*1.2):3;
+   const offset=new THREE.Vector3(0,0,distance).applyEuler(new THREE.Euler(pitch-.2,yaw,0,'YXZ'));
+   camera.position.copy(cameraTarget).add(offset);camera.position.y=Math.max(.3,Math.min(currentRoom.height-.2,camera.position.y));
+   camera.lookAt(cameraTarget);hideOccluders(camera.position,cameraTarget,object);
+  }else{
+   const next=moveSpectator(camera.position,yaw,spectator.keys||{},dt,currentRoom);camera.position.set(next.x,next.y,next.z);
+   camera.rotation.set(pitch,yaw,0,'YXZ');
+  }
+ }
+ else if(playing){const isHider=(own.role||own.team)==='hider';const myObject=own.propId?objectModels.get(own.propId):null;const pos=myObject?myObject.position:people.get(myId)?.position||new THREE.Vector3(own.x,own.y||0,own.z);if(isHider){
   const ph=myObject?(propTypes[myObject.userData.type]?.height||.8):1.7;
   cameraTarget.copy(pos).add(new THREE.Vector3(0,Math.min(1.25,ph*.64+.17),0));
   const size=myObject?dimensions({type:myObject.userData.type}):null;
@@ -297,7 +334,7 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   // Yükseğe asılı kılıklarda (duvardaki tablo, tavandaki lamba) kamera daha geriden ve daha
   // aşağıdan bakar, böylece ekranı tavan değil oda doldurur; alçak kılıklarda hafif yukarıdan.
   const rise=highUp>0?-Math.min(1.35,highUp*.85+.25):.5;
-  desired.y=Math.max(.55,Math.min(ROOM.height-.75,desired.y+rise));
+  desired.y=Math.max(.55,Math.min(currentRoom.height-.75,desired.y+rise));
   desired.x=Math.max(-24,Math.min(24,desired.x));desired.z=Math.max(-26,Math.min(26,desired.z));
   if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*24));
   // Yükseğe asılı kılıkta tam nesneye bakmak kareyi tavanla doldurur; bakış noktası biraz aşağı
@@ -317,7 +354,7 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
    else if(autoQuality&&avg>1/24&&renderScale>.65){renderScale=Math.max(.65,renderScale-.15);applyQuality(quality);api.onQuality?.(quality,true);}}}
  }
  function pickObject(maxDistance=4.5){if(!own)return null;scene.updateMatrixWorld(true);raycaster.setFromCamera(new THREE.Vector2(0,0),camera);raycaster.far=12;const groups=[...objectModels.values()].filter(g=>g.userData.objectId!==own.propId);const intersections=raycaster.intersectObjects(groups,true);const wall=raycaster.intersectObjects(collisionMeshes,false)[0];for(const hit of intersections){if(wall&&wall.distance+.025<hit.distance)return null;let g=hit.object;while(g&&!g.userData.objectId)g=g.parent;if(!g)continue;const distance=objectDistance(own,{type:g.userData.type,x:g.position.x,z:g.position.z,angle:g.rotation.y});return distance<=maxDistance?g.userData.objectId:null;}return null;}
- function reset(){for(const fx of revealEffects)clearEffect(fx);revealEffects.length=0;seenEffects.clear();own=null;currentState=null;currentId=null;wasPlaying=false;for(const p of people.values())p.visible=false;updateObjects(initialProps);for(const shot of shots)scene.remove(shot.g);shots.length=0;seenShots.clear();}
+ function reset(){useMap('loft');for(const fx of revealEffects)clearEffect(fx);revealEffects.length=0;seenEffects.clear();own=null;currentState=null;currentId=null;wasPlaying=false;for(const p of people.values())p.visible=false;updateObjects(initialProps);for(const shot of shots)scene.remove(shot.g);shots.length=0;seenShots.clear();}
  const resize=()=>{const width=container.clientWidth||innerWidth,height=container.clientHeight||innerHeight;camera.aspect=width/height;camera.updateProjectionMatrix();renderer.setSize(width,height);};window.addEventListener('resize',resize);resize();
  applyQuality(quality,false);
  const api={renderer,camera,sync,render,reset,kick:()=>{recoil=1;},pickObject,preview,

@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {moveSpectator} from '../public/spectator.js';
+import {ROOM} from '../public/world.js';
+import {player,start,tick,action,view,sanitizeSettings} from '../game.js';
+test('free camera follows yaw, normalizes diagonals, supports vertical flight and stays inside the room',()=>{
+ const p={x:0,y:2,z:0},distance=q=>Math.hypot(q.x-p.x,q.y-p.y,q.z-p.z);
+ const forward=moveSpectator(p,0,{w:true},.05,ROOM),diagonal=moveSpectator(p,0,{w:true,d:true,' ':true},.05,ROOM);
+ assert.equal(forward.z,-.25);assert.ok(Math.abs(distance(forward)-distance(diagonal))<1e-10);
+ assert.equal(moveSpectator(p,Math.PI/2,{w:true},.05,ROOM).x,-.25);
+ assert.equal(moveSpectator(p,0,{' ':true,shift:true},.05,ROOM).y,2.6);
+ assert.equal(moveSpectator(p,0,{c:true},.05,ROOM).y,1.75);
+ assert.deepEqual(moveSpectator(p,0,{},.05,ROOM),p);
+ const edge=moveSpectator({x:99,y:-10,z:-99},0,{d:true,c:true,w:true},1,ROOM);
+ assert.deepEqual(edge,{x:ROOM.width/2-.2,y:.25,z:-ROOM.depth/2+.2});
+});
+test('found spectators see distant actors but cannot change the world; living visibility remains restricted',()=>{
+ const r={code:'1234',host:'a',phase:'lobby',settings:sanitizeSettings({teamSize:2,botMode:'off'}),players:{a:player('a','Hunter',false,'hunter'),b:player('b','Viewer',false,'hider'),c:player('c','Survivor',false,'hider')}};
+ assert.ok(start(r,1000).ok);r.phase='play';r.until=999999;
+ Object.assign(r.players.a,{x:13,z:-17});Object.assign(r.players.b,{x:-13,z:17});Object.assign(r.players.c,{x:-12,z:17});
+ assert.equal(view(r,'b',2000).players.find(p=>p.id==='a').visible,false);
+ r.players.b.status='found';const packet=view(r,'b',2000);
+ assert.equal(packet.players.find(p=>p.id==='a').visible,true);assert.equal(packet.spectating,'c');
+ assert.equal(packet.players.find(p=>p.id==='a').propId,undefined);
+ const before=JSON.stringify(r.objects),pos={x:r.players.b.x,z:r.players.b.z};
+ for(const kind of ['possess','shuffle','decoy','lock','reload'])assert.equal(action(r,'b',{kind,objectId:r.objects[0].id},2000).ok,false);
+ assert.equal(JSON.stringify(r.objects),before);const control=structuredClone(r);
+ r.players.b.input={x:1,z:1,jump:true,fire:true,lift:1};r.players.b.inputAt=2000;tick(r,2000,.05);tick(control,2000,.05);
+ assert.deepEqual({x:r.players.b.x,z:r.players.b.z},pos);assert.deepEqual(r.objects,control.objects);
+ r.players.c.status='found';assert.equal(view(r,'b',2000).spectating,undefined);
+});

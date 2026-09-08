@@ -1,0 +1,42 @@
+{
+  "date": "2026-09-08",
+  "kind": "design references, not playable maps",
+  "concepts": [
+    {
+      "name": "Kıyı Pazarı",
+      "prompt": "A compact covered seaside produce market in a sunny Aegean town: blue canvas awnings, striped stalls of oranges and vegetables, fishmonger's ice counter, stacked wooden crates, hanging scales, a tiny cafe terrace and a delivery aisle. Five connected zones around a central fountain, two looping routes and narrow stall passages. Turquoise ceramic, honey wood, lemon yellow, terracotta. Clear exits, clutter at several heights, no crowded people.",
+      "index": 1,
+      "status": "submission_failed",
+      "error": "Out of credits on free (null) plan in Private workspace."
+    },
+    {
+      "name": "Çatı Serası",
+      "prompt": "A cheerful urban rooftop greenhouse garden: glasshouse nursery with potting benches and watering cans, colorful flower shop, a tool workshop, a small tea corner, an open central deck. Glass walls give long sightlines but tall planters and shelving provide low cover. Two loops around a raised herb garden. Real botanical plants, warm wood, sage metal frames and yellow rubber hose. City skyline outside boundaries, safe waist-high perimeter rail.",
+      "index": 2,
+      "status": "submission_failed",
+      "error": "Out of credits on free (null) plan in Private workspace."
+    },
+    {
+      "name": "Son Jeton",
+      "prompt": "A bright nostalgic 1990s neighborhood arcade and laundromat, connected spaces within one small venue: pastel arcade machines, pinball tables, billiards area, laundromat washing machines with laundry baskets, a snack counter with cups and trays, a maintenance storeroom. Daylight through big windows; cobalt, butter yellow and coral. Two loops around the snack counter and multiple readable doorways. Cheerful credible real interior, not dark cyberpunk, no intense neon.",
+      "index": 3,
+      "status": "submission_failed",
+      "error": "Out of credits on free (null) plan in Private workspace."
+    },
+    {
+      "name": "Minik Mucitler",
+      "prompt": "A photorealistic playful children's science discovery museum after visiting hours: hands-on experiments on wooden workbenches, toy-sized mechanical models, a craft studio with paints and brushes, a mini planetarium corner, gift-shop shelves and a robot repair bench. Bright primary accents used sparingly on a warm cream interior, daylight skylights, polished terrazzo floor. Five compact interconnected galleries around a large wooden mechanical solar-system exhibit. Props at floor and tabletop heights, no hazardous machinery.",
+      "index": 4,
+      "status": "submission_failed",
+      "error": "Out of credits on free (null) plan in Private workspace."
+    },
+    {
+      "name": "Bavul Molası",
+      "prompt": "A sunny small Mediterranean boutique hotel lobby and breakfast courtyard: reception desk with bell and laptop, luggage storage with suitcases and carts, cozy lounge sofas, breakfast buffet with plates and coffee machines, shaded poolside patio with towels and planters. One compact interconnected floor with two loops around a shallow decorative courtyard pool, clear wide doors, optional small luggage shortcut. Cream travertine, teal shutters, striped coral parasols, photoreal natural morning light.",
+      "index": 5,
+      "job_id": "fabdda52-799e-4919-9b01-0cf336da0a86",
+      "status": "completed",
+      "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3J0lDA8J7xCSdkM1Z0khz8Ftn6f/hf_20260908_115528_fabdda52-799e-4919-9b01-0cf336da0a86.png"
+    }
+  ]
+}
