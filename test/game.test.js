@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {player,start,tick,action,possess,shuffle,shoot,reload,view,sanitizeSettings,configureRoom,syncBots,setTeam,PREP_MS,ROUND_MS,SHOT_MS,RELOAD_MS,JUMP_SPEED,LIFT_MAX} from '../game.js';
+import {player,start,tick,action,possess,shuffle,shoot,reload,view,sanitizeSettings,configureRoom,syncBots,setTeam,PREP_MS,ROUND_MS,SHOT_MS,RELOAD_MS,JUMP_SPEED,LIFT_MAX,HUNTER_SPEED,DEFAULT_HITS,DEFAULT_ESCAPE} from '../game.js';
 import {free,propTypes,nearestHit,generateProps,zoneAt,zones,surfaceHeight,fixtures,fitsHome} from '../public/world.js';
 function room(size=1,botMode='off'){
  const r={code:'TEST',host:'a',phase:'lobby',settings:sanitizeSettings({teamSize:size,botMode,swapTeams:false}),players:{a:player('a','Avcı',false,'hunter'),b:player('b','Saklanan',false,'hider')}};
@@ -54,10 +54,11 @@ test('moving moves the possessed world prop and locking freezes it; stale input 
  action(r,p,{kind:'lock'},20001);const x=p.x;tick(r,20050,.1);assert.equal(p.x,x);action(r,p,{kind:'lock'},20060);tick(r,21000,.1);assert.equal(p.x,x);
  p.propId=null;p.x=13.2;p.z=0;p.input={x:1};p.inputAt=22000;tick(r,22000,.1);assert.ok(p.x<=13.85-.28+.001,'walls prevent escape');
 });
-test('one spray settles a real object; a hidden player still soaks ten at a time up to 100',()=>{
+test('one spray settles a real object; a hidden player soaks the configured share up to 100',()=>{
  const dummy=scenario();dummy.p.x=5;assert.ok(shoot(dummy.r,dummy.h,20000));assert.deepEqual(dummy.r.results.at(-1).data,{wet:100,found:false,objectName:'Çamaşır sepeti',real:true});
- const {r,h,p,o}=scenario();possess(r,p,o.id);for(let i=0;i<9;i++){assert.ok(shoot(r,h,20000+i*SHOT_MS));assert.equal(p.status,'alive');assert.equal(r.results.at(-1).data.found,false);assert.equal(r.results.at(-1).data.real,false);}
- assert.equal(p.water,90);assert.ok(shoot(r,h,20000+9*SHOT_MS));assert.equal(o.wet,100);assert.equal(p.status,'found');assert.equal(r.results.at(-1).data.found,true);tick(r,22000,.025);assert.equal(r.winner,'hunter');
+ const {r,h,p,o}=scenario();assert.equal(r.settings.revealHits,DEFAULT_HITS);possess(r,p,o.id);
+ for(let i=0;i<DEFAULT_HITS-1;i++){assert.ok(shoot(r,h,20000+i*SHOT_MS));assert.equal(p.status,'alive');assert.equal(r.results.at(-1).data.found,false);assert.equal(r.results.at(-1).data.real,false);assert.equal(p.water,Math.ceil(100/DEFAULT_HITS)*(i+1));}
+ assert.ok(shoot(r,h,20000+(DEFAULT_HITS-1)*SHOT_MS));assert.equal(o.wet,100);assert.equal(p.status,'found');assert.equal(r.results.at(-1).data.found,true);tick(r,22000,.025);assert.equal(r.winner,'hunter');
 });
 test('water cannon rate, 25-shot tank, empty-tank refusal, and two-second reload are authoritative',()=>{
  const {r,h,p}=scenario();p.x=5;for(let i=0;i<25;i++){assert.ok(shoot(r,h,20000+i*SHOT_MS));assert.equal(shoot(r,h,20000+i*SHOT_MS+1),false);}assert.equal(h.ammo,0);assert.equal(shoot(r,h,24000),false);assert.ok(reload(r,h,24000).ok);assert.equal(h.reloadUntil,24000+RELOAD_MS);assert.equal(shoot(r,h,25000),false);tick(r,26000,.025);assert.equal(h.ammo,100);assert.equal(h.reloadUntil,0);assert.ok(shoot(r,h,26001));
@@ -263,4 +264,18 @@ test('Q ile dönüşüm bulunduğun yere yakışan eşyalarla sınırlı kalır'
    if(res.ok)assert.ok(fitsHome(res.type,'support'),`${res.type} yüzeyde durabilir olmalı`);
   }
  }
+});
+test('reveal hits and escape speed are room settings, not hardcoded',()=>{
+ const clamp=sanitizeSettings({revealHits:99,escapeBoost:9});assert.equal(clamp.revealHits,10);assert.equal(clamp.escapeBoost,2);
+ const loose=sanitizeSettings({revealHits:0,escapeBoost:.2});assert.equal(loose.revealHits,1);assert.equal(loose.escapeBoost,1);
+ assert.equal(sanitizeSettings({revealHits:'x',escapeBoost:'y'}).revealHits,DEFAULT_HITS);
+ // Tek isabetlik odada saklanan ilk atışta açığa çıkar.
+ const one=scenario();one.r.settings.revealHits=1;possess(one.r,one.p,one.o.id);assert.ok(shoot(one.r,one.h,20000));assert.equal(one.p.water,100);assert.equal(one.p.status,'found');
+ // Dayanıklı odada aynı isabet yalnızca beşte bir doldurur.
+ const tough=scenario();tough.r.settings.revealHits=5;possess(tough.r,tough.p,tough.o.id);assert.ok(shoot(tough.r,tough.h,20000));assert.equal(tough.p.water,20);assert.equal(tough.p.status,'alive');
+ // Kaçış hızı ayarı gerçekten yürüme hızını belirler.
+ const run=(boost)=>{const {r,p}=scenario();r.settings.escapeBoost=boost;p.propId=null;p.locked=false;p.water=30;p.x=0;p.z=8;p.input={x:1};p.inputAt=22000;const before=p.x;tick(r,22100,.1);return p.x-before;};
+ const slow=run(1),fast=run(2);assert.ok(fast>slow*1.9&&fast<slow*2.1,`kaçış hızı ayarı işlemedi: ${slow} / ${fast}`);
+ assert.ok(Math.abs(slow-HUNTER_SPEED*.1)<.02,'1x kaçış avcı hızına eşit olmalı');
+ assert.equal(DEFAULT_ESCAPE,1.1);
 });

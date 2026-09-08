@@ -22,7 +22,7 @@ test('two clients: configurable lobby, permissions, chosen props, water shots, h
   await delay(100);assert.ok((await b.emitWithAck('action',{kind:'shuffle'})).ok);assert.equal(p.changes,2);assert.ok((await b.emitWithAck('settings',{teamSize:2})).error);
   // Aim through the actual network input path at a dry transformed object.
   r.phase='play';r.until=Date.now()+10000;p.input={};p.locked=true;p.x=0;p.z=7;r.objects[0].x=0;r.objects[0].z=7;r.objects[0].type='basket';h.x=0;h.z=10;
-  const hitPromise=wait(a,'hit');a.emit('input',{x:0,z:0,yaw:0,pitch:Math.atan2(.28-1.62,3),fire:true});const hit=await hitPromise;assert.equal(hit.found,false);assert.equal(hit.wet,10);assert.equal(p.status,'alive');
+  const hitPromise=wait(a,'hit');a.emit('input',{x:0,z:0,yaw:0,pitch:Math.atan2(.28-1.62,3),fire:true});const hit=await hitPromise;assert.equal(hit.found,false);assert.equal(hit.wet,34,'üç isabetlik varsayılanda her atış yüzde otuz dört doldurur');assert.equal(p.status,'alive');
   a.emit('input',{x:0,z:0,yaw:0,pitch:0,fire:false});const live=await wait(a,'state');assert.ok(live.shots.length);assert.equal(live.players.find(q=>q.id===b.id).x,undefined);assert.ok(live.objects.every(o=>!('owner'in o)));assert.ok(h.ammo<100);
   a.disconnect();await delay(120);assert.equal(r.host,b.id);assert.equal(r.phase,'end');assert.equal(r.winner,'hider');
   assert.equal((await fetch(url+'/health')).status,200);assert.equal((await fetch(url+'/scene.js')).status,200);assert.equal((await fetch(url+'/vendor/three.module.js')).status,200);

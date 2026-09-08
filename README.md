@@ -2,7 +2,7 @@
 
 Gün ışığı alan, 28 × 36 metre büyüklüğündeki loftta nesnelere dönüşerek saklanma oyunu. Tarayıcıda 3D, gerçek zamanlı çok oyunculu; Node.js, Socket.IO, Three.js. Arayüz Türkçe.
 
-Loft, ortadaki koridora kapı boşluklarıyla açılan beş temalı odadan oluşur: oturma odası, yatak odası, mutfak, çalışma köşesi ve giriş/vitrin. Her odanın kendi nesne kategorisi vardır — mutfakta kupa, tabure ve saksı; yatak odasında yastık, çamaşır sepeti ve valiz; çalışma köşesinde kitap yığını ve valiz. Her turda nesnelerin hem yeri hem türü yeniden karılır, aynı tur asla tekrarlanmaz. Mutfakta her turda mutlaka bir kütük yemek masası, oturma odasında mutlaka bir duvar tablosu bulunur; bunlar da saklanılabilir, yerleri değişir ama hiç ikilenmez. Küçük eşyalar tezgah, ada, masa ve bank üstünde de doğabilir. Oda kurucusu lobide toplam nesne sayısını da (20–90 arası) ayarlayabilir. Saklananlar tura odalara dağılmış olarak başlar.
+Loft, ortadaki koridora kapı boşluklarıyla açılan beş temalı odadan oluşur: oturma odası, yatak odası, mutfak, çalışma köşesi ve giriş/vitrin. Her odanın kendi nesne kategorisi vardır — mutfakta kupa, tabure ve saksı; yatak odasında yastık, çamaşır sepeti ve valiz; çalışma köşesinde kitap yığını ve valiz. Her turda nesnelerin hem yeri hem türü yeniden karılır, aynı tur asla tekrarlanmaz. Mutfakta her turda mutlaka bir kütük yemek masası, oturma odasında mutlaka bir duvar tablosu bulunur; bunlar da saklanılabilir, yerleri değişir ama hiç ikilenmez. Küçük eşyalar tezgah, ada, masa ve bank üstünde de doğabilir. Oda kurucusu lobide toplam nesne sayısını (20–90 arası), saklananın kaç isabette açığa çıkacağını ve ıslanan saklananın kaçış hızını da ayarlayabilir. Saklananlar tura odalara dağılmış olarak başlar.
 
 ## Başlat
 
@@ -18,6 +18,8 @@ npm start
 - Takım başına 1–12 kişi: 1'e 1, 3'e 3, 5'e 5, 6'ya 6, 12'ye 12.
 - Bot yok / boş yerleri doldur / iki takım için ayrı bot sayısı.
 - 10–60 saniye saklanma; 1–10 dakika tur.
+- **Islatma dayanıklılığı (1–10 isabet, varsayılan 3):** saklanan bir oyuncunun açığa çıkması için gereken isabet sayısı. Her isabet %100'ün bu paya bölünmüş kadarını doldurur (3 isabette %34), son gereken isabet tam %100'e oturur. Gerçek eşyalara her ayarda tek atış yeter.
+- **Islanınca kaçış hızı (1×–2×, varsayılan 1.1×):** ilk isabeti yiyen saklananın avcıya göre kaçış hızı. 1× seçilirse iki taraf aynı hızda koşar.
 - Oyuncular takım seçebilir veya otomatik dağıtılır.
 - Oda sahibi lobide bot ekler/çıkarır, insanları taşır, kapasite ve süreleri değiştirir.
 - Tur, her iki tarafta en az bir kişi varsa başlar: takımların eşit olması gerekmez, 1'e 1 de olur. Takım başına seçilen sayı yalnızca üst sınırdır. Yeni turda takımlar yer değiştirir.
@@ -26,9 +28,9 @@ npm start
 
 ## Oynanış
 
-**Saklanan:** Eşyaya yaklaş, E ile yakındaki nesneleri aç, ilk kılığını kendin seç — panel her nesnenin gerçek 3D önizlemesini gösterir. O nesnenin yerini alırsın. Yerini ayarla, **Z/X** ile nesnenin yönünü çevir, **Boşluk** ile zıpla ve F ile konumunu sabitle. Zıplama tezgah, ada, yemek masası, bank, yatak yüksekliğine kadar çıkar; puf, valiz, sepet ve kütük masa gibi geniş eşyaların üstüne de basabilirsin. Kupa ya da kitap yığını gibi küçük bir kılıktayken yemek masasının, çalışma masasının ve kütük masanın altına girebilirsin — büyük bir kılık oraya sığmaz. İlk seçim ücretsizdir; ardından Q ile **üç kez** o odaya uygun, farklı bir nesneye dönüşebilirsin. Değişimde konumun ve biriken su korunur. Bir kez ıslandıktan sonra kılığın sabitse çözülür ve avcının **iki katı** hızla kaçabilirsin. Henüz nesne seçmemiş insan oyuncu süre bitince otomatik dönüştürülmez; seçimini yapana kadar görünür ve ıslatılabilir.
+**Saklanan:** Eşyaya yaklaş, E ile yakındaki nesneleri aç, ilk kılığını kendin seç — panel her nesnenin gerçek 3D önizlemesini gösterir. O nesnenin yerini alırsın. Yerini ayarla, **Z/X** ile nesnenin yönünü çevir, **Boşluk** ile zıpla ve F ile konumunu sabitle. Zıplama tezgah, ada, yemek masası, bank, yatak yüksekliğine kadar çıkar; puf, valiz, sepet ve kütük masa gibi geniş eşyaların üstüne de basabilirsin. Kupa ya da kitap yığını gibi küçük bir kılıktayken yemek masasının, çalışma masasının ve kütük masanın altına girebilirsin — büyük bir kılık oraya sığmaz. İlk seçim ücretsizdir; ardından Q ile **üç kez** o odaya uygun, farklı bir nesneye dönüşebilirsin. Değişimde konumun ve biriken su korunur. Bir kez ıslandıktan sonra kılığın sabitse çözülür ve avcının **oda ayarındaki katı** (varsayılan 1.1×) hızla kaçabilirsin. Henüz nesne seçmemiş insan oyuncu süre bitince otomatik dönüştürülmez; seçimini yapana kadar görünür ve ıslatılabilir.
 
-**Avcı:** Sol fare tuşuna veya Boşluk'a basılı tutarak su sık. Doğru nişan ve görüş gerekir; duvarlar, mobilyalar ve öndeki nesneler suyu keser. **Sıradan bir eşyaya tek atış yeter:** ilk isabette tamamen ıslanır ve "gerçek eşya" olarak işaretlenir, üstüne depo boşaltmaya gerek yoktur. Saklanan bir oyuncu ise her isabette %10 ıslanır ve ancak %100'e ulaştığında açığa çıkıp elenir. Depo 25 atış alır; R ile 2 saniyede dolar.
+**Avcı:** Sol fare tuşuna veya Boşluk'a basılı tutarak su sık. Doğru nişan ve görüş gerekir; duvarlar, mobilyalar ve öndeki nesneler suyu keser. **Sıradan bir eşyaya tek atış yeter:** ilk isabette tamamen ıslanır ve "gerçek eşya" olarak işaretlenir, üstüne depo boşaltmaya gerek yoktur. Saklanan bir oyuncu ise oda ayarına göre ıslanır — varsayılan 3 isabette, yani her atışta %34 — ve ancak %100'e ulaştığında açığa çıkıp elenir. Depo 25 atış alır; R ile 2 saniyede dolar.
 
 Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm, can puanı, silahlı çatışma, kaçış görevleri veya yetenek kartları yoktur.
 

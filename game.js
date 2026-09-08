@@ -2,7 +2,10 @@ import {assembly,moveAssembly,detachChildren,settleObjects} from './public/physi
 import {randomUUID} from 'node:crypto';
 import {free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,contains,homeKind,fitsHome} from './public/world.js';
 export {dist};
-export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPEED=4.3,ESCAPE_SPEED=HUNTER_SPEED*2;
+// Kaç isabetin bir saklananı ortaya çıkardığı ve ıslanan saklananın kaçış hızı artık oda
+// ayarıdır; buradaki değerler yalnızca varsayılan.
+export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPEED=4.3;
+export const DEFAULT_HITS=3,MIN_HITS=1,MAX_HITS=10,DEFAULT_ESCAPE=1.1,MIN_ESCAPE=1,MAX_ESCAPE=2;
 // Hiders can hop onto counters, tables and beds: JUMP_SPEED clears the 1 m kitchen counter with
 // a little room to spare (apex = JUMP_SPEED^2 / 2*GRAVITY ~ 1.21 m). SPIN_SPEED is how fast a
 // disguise can be turned on the spot, in radians per second.
@@ -12,9 +15,10 @@ export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPE
 // için orada bırakılan nesne görülebilir kalır. Duvara asılı parçalar (tablo, perde, duvar rafı)
 // LIFT_MAX_MOUNTED'e kadar çıkar; onlar duvarda durması beklenen, göz alıcı parçalar.
 export const GRAVITY=18,JUMP_SPEED=6.6,SPIN_SPEED=2.4,LIFT_SPEED=1.4,LIFT_MAX=2.2,LIFT_MAX_MOUNTED=3.4;
-export const defaultSettings={teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:DEFAULT_PROP_COUNT};
+export const defaultSettings={teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:DEFAULT_PROP_COUNT,revealHits:DEFAULT_HITS,escapeBoost:DEFAULT_ESCAPE};
 const teams=['hunter','hider'];
 const integer=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)))):fallback;
+const decimal=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)*20)/20)):fallback;
 export function sanitizeSettings(input={},previous=defaultSettings){
  input=input&&typeof input==='object'?input:{};
  const settings={...defaultSettings,...previous};
@@ -25,6 +29,8 @@ export function sanitizeSettings(input={},previous=defaultSettings){
  if('roundSeconds'in input)settings.roundSeconds=integer(input.roundSeconds,60,600,180);
  if(['choose','auto'].includes(input.teamSelection))settings.teamSelection=input.teamSelection;
  if('objectCount'in input)settings.objectCount=integer(input.objectCount,MIN_PROP_COUNT,MAX_PROP_COUNT,settings.objectCount);
+ if('revealHits'in input)settings.revealHits=integer(input.revealHits,MIN_HITS,MAX_HITS,settings.revealHits);
+ if('escapeBoost'in input)settings.escapeBoost=decimal(input.escapeBoost,MIN_ESCAPE,MAX_ESCAPE,settings.escapeBoost);
  if(typeof input.swapTeams==='boolean')settings.swapTeams=input.swapTeams;
  return settings;
 }
@@ -153,12 +159,14 @@ export function shoot(r,p,now=Date.now()){
  if(hit.kind==='object'){
   o=r.objects.find(o=>o.id===hit.id);target=o.owner?r.players[o.owner]:null;
   // A plain piece of decor is settled with a single spray — no point emptying the tank into it.
-  // Only a disguised player soaks up ten percent at a time on the way to a hundred.
-  o.wet=target?Math.min(100,o.wet+10):100;wet=o.wet;objectName=propTypes[o.type].name;
+  // A disguised player soaks the share the room's revealHits setting dictates; rounding up keeps the
+  // percentages whole and makes the last needed hit land exactly on a hundred.
+  const soak=Math.ceil(100/(r.settings?.revealHits||DEFAULT_HITS));
+  o.wet=target?Math.min(100,o.wet+soak):100;wet=o.wet;objectName=propTypes[o.type].name;
   if(target)target.water=wet;
  }else if(hit.kind==='player'){
   target=r.players[hit.id];if(target?.team!=='hider')target=null;
-  if(target){target.water=Math.min(100,target.water+10);wet=target.water;objectName='Oyuncu';}
+  if(target){target.water=Math.min(100,target.water+Math.ceil(100/(r.settings?.revealHits||DEFAULT_HITS)));wet=target.water;objectName='Oyuncu';}
  }
  if(wet!==undefined){
   const found=!!target&&target.status==='alive'&&wet>=100;
@@ -228,7 +236,7 @@ export function tick(r,now,dt){
    if(!free(nx,nz,radius,r.objects,null,ny,tall))return false;p.x=nx;p.z=nz;p.y=ny;return true;
   };
   if(len&&!p.locked){
-   x/=len;z/=len;const speed=p.team==='hunter'?HUNTER_SPEED:p.water>0?ESCAPE_SPEED:o?2.8:4;
+   x/=len;z/=len;const speed=p.team==='hunter'?HUNTER_SPEED:p.water>0?HUNTER_SPEED*(r.settings?.escapeBoost||DEFAULT_ESCAPE):o?2.8:4;
    for(const [axis,amount]of [['x',x*speed*dt],['z',z*speed*dt]]){const steps=Math.max(1,Math.ceil(Math.abs(amount)/.1));for(let i=0;i<steps;i++){if(!attempt(p.x+(axis==='x'?amount/steps:0),p.z+(axis==='z'?amount/steps:0)))break;if(o){o.anchored=false;const host=r.objects.find(q=>q.id===o.supportId);if(host&&!contains(host,o.x,o.z,-.035))delete o.supportId;}}}
   }
   const spin=Math.max(-1,Math.min(1,Number(p.input.spin)||0));
