@@ -28,7 +28,7 @@ npm start
 
 ## Oynanış
 
-**Saklanan:** Eşyaya yaklaş, E ile yakındaki nesneleri aç, ilk kılığını kendin seç — panel her nesnenin gerçek 3D önizlemesini gösterir. O nesnenin yerini alırsın. Yerini ayarla, **Z/X** ile nesnenin yönünü çevir, **Boşluk** ile zıpla ve F ile konumunu sabitle. Zıplama tezgah, ada, yemek masası, bank, yatak yüksekliğine kadar çıkar; puf, valiz, sepet ve kütük masa gibi geniş eşyaların üstüne de basabilirsin. Kupa ya da kitap yığını gibi küçük bir kılıktayken yemek masasının, çalışma masasının ve kütük masanın altına girebilirsin — büyük bir kılık oraya sığmaz. İlk seçim ücretsizdir; ardından Q ile **üç kez** o odaya uygun, farklı bir nesneye dönüşebilirsin. Değişimde konumun ve biriken su korunur. Bir kez ıslandıktan sonra kılığın sabitse çözülür ve avcının **oda ayarındaki katı** (varsayılan 1.1×) hızla kaçabilirsin. Henüz nesne seçmemiş insan oyuncu süre bitince otomatik dönüştürülmez; seçimini yapana kadar görünür ve ıslatılabilir.
+**Saklanan:** Bir eşyanın yanına geldiğinde yakındaki nesneler kendiliğinden alt şeritte listelenir — E'ye basmak gerekmez, 1–8 ile seçersin. Şerit fareyi almaz, bakışın ve hareketin bozulmaz; E ile kapatırsan o eşyanın yanından ayrılana kadar bir daha açılmaz. Baktığın eşya olmak için de E yeter. İlk kılığını kendin seç — panel her nesnenin gerçek 3D önizlemesini gösterir. O nesnenin yerini alırsın. Yerini ayarla, **Z/X** ile nesnenin yönünü çevir, **Boşluk** ile zıpla ve F ile konumunu sabitle. Zıplama tezgah, ada, yemek masası, bank, yatak yüksekliğine kadar çıkar; puf, valiz, sepet ve kütük masa gibi geniş eşyaların üstüne de basabilirsin. Kupa ya da kitap yığını gibi küçük bir kılıktayken yemek masasının, çalışma masasının ve kütük masanın altına girebilirsin — büyük bir kılık oraya sığmaz. İlk seçim ücretsizdir; ardından Q ile **üç kez** o odaya uygun, farklı bir nesneye dönüşebilirsin. Değişimde konumun ve biriken su korunur. Bir kez ıslandıktan sonra kılığın sabitse çözülür ve avcının **oda ayarındaki katı** (varsayılan 1.1×) hızla kaçabilirsin. Henüz nesne seçmemiş insan oyuncu süre bitince otomatik dönüştürülmez; seçimini yapana kadar görünür ve ıslatılabilir.
 
 **Avcı:** Sol fare tuşuna veya Boşluk'a basılı tutarak su sık. Doğru nişan ve görüş gerekir; duvarlar, mobilyalar ve öndeki nesneler suyu keser. **Sıradan bir eşyaya tek atış yeter:** ilk isabette tamamen ıslanır ve "gerçek eşya" olarak işaretlenir, üstüne depo boşaltmaya gerek yoktur. Saklanan bir oyuncu ise oda ayarına göre ıslanır — varsayılan 3 isabette, yani her atışta %34 — ve ancak %100'e ulaştığında açığa çıkıp elenir. Depo 25 atış alır; R ile 2 saniyede dolar.
 
@@ -40,7 +40,7 @@ Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm,
 |---|---|
 | WASD / oklar | Hareket |
 | Fare | Bakış ve kamera (tur boyunca fare imleci oyuna kilitlenir) |
-| E | İlk nesneyi seç (3D önizlemeli panel) |
+| E | Baktığın eşya ol; hiçbir şeye bakmıyorsan listeyi aç/kapat. Bir eşyanın yanına gelince liste **kendiliğinden açılır**, 1–8 ile seçersin |
 | Q | Odaya ve bulunduğun yere uygun rastgele nesneye değiş (3 hak) — yerdeyken yerde duran eşyalara, bir yüzeydeyken yüzeyde duran eşyalara |
 | C | Sahte kopya bırak (saklanma süresinde de olur, turda 3 hak, isabet alana kadar kalır) |
 | Z / X | Nesnenin yönünü çevir |
@@ -52,6 +52,24 @@ Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm,
 | Esc | Fareyi serbest bırak ve menüyü aç — fare serbest kalır, ekrana tıklayınca oyun geri alır |
 
 Saklanan dönüşünce kendi nesnesini her zaman üçüncü şahıs kameradan görür. Kamera baktığın yöne gider; arada kalan duvar, cam cephe, üst silme, tavan paneli veya mobilya o kare boyunca gizlenir, yani duvarın arkasına geçmesi gerektiğinde duvar yokmuş gibi davranır. Duvardaki tablo veya tavandaki lamba gibi yükseğe asılı kılıklarda daha geriden ve daha aşağıdan bakar, bakış noktası da nesnenin biraz altına iner; böylece ekranı tavan değil oda doldurur. Avcı birinci şahıs kamerayla su tabancası taşır. Tur sırasında fare imleci her iki tarafta da oyuna kilitlenir; imleç ancak nesne seçme paneli veya bir menü açıkken serbest kalır. Tarayıcı fare kilidini desteklemiyorsa sürükleyerek bakılabilir; Boşluk ile ateş edilebilir. Dokunmatik yön ve ateş düğmeleri de bulunur; ana oynanış masaüstü için tasarlanmıştır.
+
+## Performans (Intel HD ve zayıf kartlar)
+
+Oyun içinde **Esc → Görüntü kalitesi**: Yüksek · Orta · Düşük. Ekran kartının adı Intel HD/UHD, yazılım render (SwiftShader/llvmpipe) gibi zayıf bir kartı gösteriyorsa oyun kendiliğinden **düşük** açılır; seçimin tarayıcıda saklanır ve elle seçim yaparsan otomatik müdahale durur. Ayrıca kare süresi 90 karede bir ölçülür: 38 FPS'nin altına düşerse kademe bir aşağı iner, hâlâ ağırsa çözünürlük %65'e kadar kısılır ve durum bildirilir.
+
+Kademeler arasında değişenler:
+
+| | Yüksek | Orta | Düşük |
+|---|---|---|---|
+| Gölge haritası | 3072², yumuşak (PCFSoft) | 1536², sert (PCF) | kapalı |
+| Gölge tazeleme | her kare | 3 karede bir | — |
+| Piksel oranı | ekranın 1.75 katına kadar | 1.25 katına kadar | ekranın 0.8 katı |
+| Kenar yumuşatma | açık | kapalı | kapalı |
+| Oda dolgu ışığı | 5 | 5 | 2 |
+| Kamera önündeki engel taraması | her kare | 2 karede bir | 3 karede bir |
+| Doku keskinliği (anisotropy) | 8× | 4× | 1× |
+
+Kenar yumuşatma WebGL bağlamı kurulurken belirlendiği için yalnızca sayfa yenilenince değişir; diğer her şey seçtiğin anda uygulanır. En büyük kazanç gölgenin kapanmasıdır: güneş için ikinci bir tam sahne geçişi ortadan kalkar.
 
 ## Docker
 
