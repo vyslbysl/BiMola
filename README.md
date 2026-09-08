@@ -2,7 +2,7 @@
 
 Gün ışığı alan, 28 × 36 metre büyüklüğündeki loftta nesnelere dönüşerek saklanma oyunu. Tarayıcıda 3D, gerçek zamanlı çok oyunculu; Node.js, Socket.IO, Three.js. Arayüz Türkçe.
 
-Loft, ortadaki koridora kapı boşluklarıyla açılan beş temalı odadan oluşur: oturma odası, yatak odası, mutfak, çalışma köşesi ve giriş/vitrin. Her odanın kendi nesne kategorisi vardır — mutfakta kupa, tabure ve saksı; yatak odasında yastık, çamaşır sepeti ve valiz; çalışma köşesinde kitap yığını ve valiz. Her turda nesnelerin hem yeri hem türü yeniden karılır, aynı tur asla tekrarlanmaz. Mutfakta her turda mutlaka bir kütük yemek masası, oturma odasında mutlaka bir duvar tablosu bulunur; bunlar da saklanılabilir, yerleri değişir ama hiç ikilenmez. Küçük eşyalar tezgah, ada, masa ve bank üstünde de doğabilir. Oda kurucusu lobide toplam nesne sayısını (20–90 arası), saklananın kaç isabette açığa çıkacağını ve ıslanan saklananın kaçış hızını da ayarlayabilir. Saklananlar tura odalara dağılmış olarak başlar.
+Loft, ortadaki koridora kapı boşluklarıyla açılan beş temalı odadan oluşur: oturma odası, yatak odası, mutfak, çalışma köşesi ve giriş/vitrin. Her odanın kendi nesne kategorisi vardır — mutfakta kupa, tabure ve saksı; yatak odasında yastık, çamaşır sepeti ve valiz; çalışma köşesinde kitap yığını ve valiz. Her turda nesnelerin hem yeri hem türü yeniden karılır, aynı tur asla tekrarlanmaz. Mutfakta her turda mutlaka bir kütük yemek masası, oturma odasında mutlaka bir duvar tablosu bulunur; bunlar da saklanılabilir, yerleri değişir ama hiç ikilenmez. Küçük eşyalar tezgah, ada, masa ve bank üstünde de doğabilir. Oda kurucusu lobide ek rastgele eşya sayısını (0–90), süs eşyası yoğunluğunu, saklananın kaç isabette açığa çıkacağını ve ıslanan saklananın kaçış hızını da ayarlayabilir. Saklananlar tura odalara dağılmış olarak başlar.
 
 ## Başlat
 
@@ -18,6 +18,8 @@ npm start
 - Takım başına 1–12 kişi: 1'e 1, 3'e 3, 5'e 5, 6'ya 6, 12'ye 12.
 - Bot yok / boş yerleri doldur / iki takım için ayrı bot sayısı.
 - 10–60 saniye saklanma; 1–10 dakika tur.
+- **Süs eşyası yoğunluğu (tam · orta · az · çok az):** tezgah, masa ve duvarlardaki küçük süslerin ne kadarı doğsun. Mobilya, tezgah ve üstünde başka bir şey taşıyan parçalar her kademede yerinde kalır; yalnızca üstünde bir şey olmayan küçük süsler seyreltilir, yani odalar kimliğini kaybetmez. Tam kademede oda ~297 nesneyle açılır, en seyrek kademede ~110'a iner — zayıf ekran kartlarında en büyük ikinci kazanç budur.
+- **Ek rastgele eşya (0–90):** her tur serpilen ekstra eşya sayısı. **Hiç** seçilirse oda yalnızca mobilyasıyla ve her odanın imza parçasıyla (mutfakta kütük masa, salonda duvar tablosu) kalır.
 - **Islatma dayanıklılığı (1–10 isabet, varsayılan 3):** saklanan bir oyuncunun açığa çıkması için gereken isabet sayısı. Her isabet %100'ün bu paya bölünmüş kadarını doldurur (3 isabette %34), son gereken isabet tam %100'e oturur. Gerçek eşyalara her ayarda tek atış yeter.
 - **Islanınca kaçış hızı (1×–2×, varsayılan 1.1×):** ilk isabeti yiyen saklananın avcıya göre kaçış hızı. 1× seçilirse iki taraf aynı hızda koşar.
 - Oyuncular takım seçebilir veya otomatik dağıtılır.
@@ -68,6 +70,8 @@ Kademeler arasında değişenler:
 | Oda dolgu ışığı | 5 | 5 | 2 |
 | Kamera önündeki engel taraması | her kare | 2 karede bir | 3 karede bir |
 | Doku keskinliği (anisotropy) | 8× | 4× | 1× |
+
+Kademelerden bağımsız olarak oda ayarlarındaki **süs eşyası yoğunluğu** ve **ek rastgele eşya** çizim sayısını doğrudan düşürür: en seyrek kurulumda sahnedeki nesne sayısı üçte bire iner, bu da Intel HD gibi kartlarda kalite kademesinden bile fazla iş görebilir.
 
 Kenar yumuşatma WebGL bağlamı kurulurken belirlendiği için yalnızca sayfa yenilenince değişir; diğer her şey seçtiğin anda uygulanır. En büyük kazanç gölgenin kapanmasıdır: güneş için ikinci bir tam sahne geçişi ortadan kalkar.
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {player,start,tick,action,possess,shuffle,shoot,reload,view,sanitizeSettings,configureRoom,syncBots,setTeam,PREP_MS,ROUND_MS,SHOT_MS,RELOAD_MS,JUMP_SPEED,LIFT_MAX,HUNTER_SPEED,DEFAULT_HITS,DEFAULT_ESCAPE} from '../game.js';
-import {free,propTypes,nearestHit,generateProps,zoneAt,zones,surfaceHeight,fixtures,fitsHome} from '../public/world.js';
+import {free,propTypes,nearestHit,generateProps,zoneAt,zones,surfaceHeight,fixtures,fitsHome,DEFAULT_DECOR} from '../public/world.js';
 function room(size=1,botMode='off'){
  const r={code:'TEST',host:'a',phase:'lobby',settings:sanitizeSettings({teamSize:size,botMode,swapTeams:false}),players:{a:player('a','Avcı',false,'hunter'),b:player('b','Saklanan',false,'hider')}};
  assert.equal(start(r,1000).ok,true);return r;
@@ -278,4 +278,22 @@ test('reveal hits and escape speed are room settings, not hardcoded',()=>{
  const slow=run(1),fast=run(2);assert.ok(fast>slow*1.9&&fast<slow*2.1,`kaçış hızı ayarı işlemedi: ${slow} / ${fast}`);
  assert.ok(Math.abs(slow-HUNTER_SPEED*.1)<.02,'1x kaçış avcı hızına eşit olmalı');
  assert.equal(DEFAULT_ESCAPE,1.1);
+});
+test('an emptier room is possible: no extra props and thinned decor still leaves a playable house',()=>{
+ const full=generateProps(51,1),bare=generateProps(0,.25);
+ assert.ok(bare.length<full.length*.45,`dolu ${full.length}, sade ${bare.length}`);
+ // Mobilya ve taşıyıcı parçalar hep kalır: üstünde bir şey duran hiçbir eşya atılamaz.
+ const kept=new Set(bare.map(o=>o.id));
+ for(const f of fixtures)if(fixtures.some(q=>q.supportId===f.id))assert.ok(kept.has(f.id),`${f.id} taşıyıcı, atılamaz`);
+ for(const o of bare)if(o.supportId)assert.ok(kept.has(o.supportId),`${o.id} boşlukta kalmış`);
+ // İmza parçaları (kütük masa, duvar tablosu) sıfır ek eşyada da tam bir kez durur.
+ for(const zone of zones.filter(z=>z.signature))assert.equal(bare.filter(o=>o.type===zone.signature).length,1,zone.signature);
+ // Ayar sınırları: yüzde yüzün üstü ve altı kırpılır, bozuk değer varsayılana döner.
+ assert.equal(sanitizeSettings({objectCount:-5,decor:9}).objectCount,0);
+ assert.equal(sanitizeSettings({decor:9}).decor,1);
+ assert.equal(sanitizeSettings({decor:.01}).decor,.25);
+ assert.equal(sanitizeSettings({decor:'x'}).decor,DEFAULT_DECOR);
+ // Oda ayarı gerçekten tura yansır.
+ const r=room();r.phase='end';assert.ok(configureRoom(r,{objectCount:0,decor:.25},'a').ok);
+ assert.ok(start(r,60000).ok);assert.ok(r.objects.length<full.length*.45,`turda ${r.objects.length} nesne`);
 });

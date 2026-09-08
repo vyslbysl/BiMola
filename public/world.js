@@ -67,7 +67,13 @@ export const fitsHome=(type,kind)=>{const homes=typeHomes.get(type);return !home
 export const commonTypes=[...new Set(zones.flatMap(zone=>zone.types))];
 // Room settings can dial the total object count up or down; each room keeps its share of the total.
 export const DEFAULT_PROP_COUNT=zones.reduce((sum,zone)=>sum+zone.count,0);
-export const MIN_PROP_COUNT=20,MAX_PROP_COUNT=90;
+export const MIN_PROP_COUNT=0,MAX_PROP_COUNT=90;
+// Süs eşyası yoğunluğu: yüzeylerde duran ve duvara asılı küçük eşyaların ne kadarı doğsun. Oda
+// tıklım tıklımken hem avcının işi imkânsızdı hem de zayıf kartlar çizim sayısına yetişemiyordu.
+// Yalnızca üstünde başka bir şey taşımayan "yaprak" eşyalar seyreltilir: mobilya, tezgah ve
+// taşıyıcı parçalar her zaman yerinde kalır, odalar kimliğini kaybetmez.
+export const DEFAULT_DECOR=1,MIN_DECOR=.25,MAX_DECOR=1;
+const decorLeaves=fixtures.filter(f=>(f.supportId||propTypes[f.type]?.mounted)&&!fixtures.some(q=>q.supportId===f.id)).map(f=>f.id);
 // Anything at or below this height can be jumped on and stood upon; taller pieces (shelves,
 // wardrobe) stay pure obstacles.
 export const STAND_MAX_HEIGHT=1.05,STAND_MIN_RADIUS=.34,BODY_HEIGHT=1.75;
@@ -90,14 +96,22 @@ function spot(zone,radius,placed){
  const y=radius<=.35?surfaceHeight(x,z,STAND_MAX_HEIGHT,placed):0;
  return free(x,z,radius,placed,null,y)?{x,y,z}:null;
 }
-export function generateProps(total=DEFAULT_PROP_COUNT){
- total=Math.max(MIN_PROP_COUNT,Math.min(MAX_PROP_COUNT,Math.round(total)||DEFAULT_PROP_COUNT));
- const placed=fixtures.map(o=>({...o}));
+export function generateProps(total=DEFAULT_PROP_COUNT,decor=DEFAULT_DECOR){
+ total=Number.isFinite(Number(total))?Math.max(MIN_PROP_COUNT,Math.min(MAX_PROP_COUNT,Math.round(Number(total)))):DEFAULT_PROP_COUNT;
+ decor=Number.isFinite(Number(decor))?Math.max(MIN_DECOR,Math.min(MAX_DECOR,Number(decor))):DEFAULT_DECOR;
+ const skip=new Set();
+ if(decor<1){
+  const pool=[...decorLeaves];
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  for(const id of pool.slice(Math.round(pool.length*decor)))skip.add(id);
+ }
+ const placed=fixtures.filter(o=>!skip.has(o.id)).map(o=>({...o}));
  for(const zone of zones){
-  const target=Math.max(2,Math.round(zone.count/DEFAULT_PROP_COUNT*total));
+  // Sıfır seçilirse oda yalnızca mobilyasıyla kalır; imza parçası (kütük masa, duvar tablosu) durur.
+  const target=total<=0?0:Math.max(1,Math.round(zone.count/DEFAULT_PROP_COUNT*total));
   // A room's `signature` piece always exists, exactly once, and eats one slot from the regular
   // random fill so the total stays on the budget the host chose.
-  const regularTarget=zone.signature?Math.max(1,target-1):target;
+  const regularTarget=zone.signature?Math.max(0,target-1):target;
   let attempts=0,made=0;
   while(made<regularTarget&&attempts<regularTarget*60){
    attempts++;

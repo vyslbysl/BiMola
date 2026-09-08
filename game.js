@@ -1,6 +1,6 @@
 import {assembly,moveAssembly,detachChildren,settleObjects} from './public/physics.js';
 import {randomUUID} from 'node:crypto';
-import {free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,contains,homeKind,fitsHome} from './public/world.js';
+import {free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,DEFAULT_DECOR,MIN_DECOR,MAX_DECOR,contains,homeKind,fitsHome} from './public/world.js';
 export {dist};
 // Kaç isabetin bir saklananı ortaya çıkardığı ve ıslanan saklananın kaçış hızı artık oda
 // ayarıdır; buradaki değerler yalnızca varsayılan.
@@ -15,7 +15,7 @@ export const DEFAULT_HITS=3,MIN_HITS=1,MAX_HITS=10,DEFAULT_ESCAPE=1.1,MIN_ESCAPE
 // için orada bırakılan nesne görülebilir kalır. Duvara asılı parçalar (tablo, perde, duvar rafı)
 // LIFT_MAX_MOUNTED'e kadar çıkar; onlar duvarda durması beklenen, göz alıcı parçalar.
 export const GRAVITY=18,JUMP_SPEED=6.6,SPIN_SPEED=2.4,LIFT_SPEED=1.4,LIFT_MAX=2.2,LIFT_MAX_MOUNTED=3.4;
-export const defaultSettings={teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:DEFAULT_PROP_COUNT,revealHits:DEFAULT_HITS,escapeBoost:DEFAULT_ESCAPE};
+export const defaultSettings={teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:DEFAULT_PROP_COUNT,decor:DEFAULT_DECOR,revealHits:DEFAULT_HITS,escapeBoost:DEFAULT_ESCAPE};
 const teams=['hunter','hider'];
 const integer=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)))):fallback;
 const decimal=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)*20)/20)):fallback;
@@ -29,6 +29,7 @@ export function sanitizeSettings(input={},previous=defaultSettings){
  if('roundSeconds'in input)settings.roundSeconds=integer(input.roundSeconds,60,600,180);
  if(['choose','auto'].includes(input.teamSelection))settings.teamSelection=input.teamSelection;
  if('objectCount'in input)settings.objectCount=integer(input.objectCount,MIN_PROP_COUNT,MAX_PROP_COUNT,settings.objectCount);
+ if('decor'in input)settings.decor=decimal(input.decor,MIN_DECOR,MAX_DECOR,settings.decor);
  if('revealHits'in input)settings.revealHits=integer(input.revealHits,MIN_HITS,MAX_HITS,settings.revealHits);
  if('escapeBoost'in input)settings.escapeBoost=decimal(input.escapeBoost,MIN_ESCAPE,MAX_ESCAPE,settings.escapeBoost);
  if(typeof input.swapTeams==='boolean')settings.swapTeams=input.swapTeams;
@@ -78,7 +79,7 @@ export function start(r,now=Date.now()){
  // Takımların eşit olması gerekmiyor: her tarafta en az bir kişi varsa tur başlar.
  if(teams.some(team=>count(r,team)<1))return {error:'Başlamak için en az bir saklanan ve bir avcı olmalı. Takım seç veya bot ekle.'};
  if((r.round||0)>0&&r.settings.swapTeams){for(const p of Object.values(r.players))p.team=p.role=p.team==='hunter'?'hider':'hunter';[r.settings.hunterBots,r.settings.hiderBots]=[r.settings.hiderBots,r.settings.hunterBots];}
- r.round=(r.round||0)+1;r.phase='prep';r.until=now+r.settings.hideSeconds*1000;r.winner=null;r.reason=null;r.shots=[];r.effects=[];r.results=[];r.events=[];r.objects=generateProps(r.settings.objectCount);r.initialObjects=r.objects.map(o=>({...o}));
+ r.round=(r.round||0)+1;r.phase='prep';r.until=now+r.settings.hideSeconds*1000;r.winner=null;r.reason=null;r.shots=[];r.effects=[];r.results=[];r.events=[];r.objects=generateProps(r.settings.objectCount,r.settings.decor);r.initialObjects=r.objects.map(o=>({...o}));
  let h=0,k=0;const spawned=[];
  for(const p of Object.values(r.players)){
   const i=p.team==='hunter'?h++:k++;let x=-3+(i%6)*1.2,z=p.team==='hunter'?-3-Math.floor(i/6)*1.1:10-Math.floor(i/6)*1.1;
