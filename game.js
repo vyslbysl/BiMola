@@ -5,6 +5,7 @@ export {dist};
 // Kaç isabetin bir saklananı ortaya çıkardığı ve ıslanan saklananın kaçış hızı artık oda
 // ayarıdır; buradaki değerler yalnızca varsayılan.
 export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPEED=4.3;
+export const DEFAULT_IDLE=30,MIN_IDLE=10,MAX_IDLE=120;
 export const DEFAULT_HITS=3,MIN_HITS=1,MAX_HITS=10,DEFAULT_ESCAPE=1.1,MIN_ESCAPE=1,MAX_ESCAPE=2;
 // Hiders can hop onto counters, tables and beds: JUMP_SPEED clears the 1 m kitchen counter with
 // a little room to spare (apex = JUMP_SPEED^2 / 2*GRAVITY ~ 1.21 m). SPIN_SPEED is how fast a
@@ -15,7 +16,7 @@ export const DEFAULT_HITS=3,MIN_HITS=1,MAX_HITS=10,DEFAULT_ESCAPE=1.1,MIN_ESCAPE
 // için orada bırakılan nesne görülebilir kalır. Duvara asılı parçalar (tablo, perde, duvar rafı)
 // LIFT_MAX_MOUNTED'e kadar çıkar; onlar duvarda durması beklenen, göz alıcı parçalar.
 export const GRAVITY=18,JUMP_SPEED=6.6,SPIN_SPEED=2.4,LIFT_SPEED=1.4,LIFT_MAX=2.2,LIFT_MAX_MOUNTED=3.4;
-export const defaultSettings={teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:DEFAULT_PROP_COUNT,decor:DEFAULT_DECOR,revealHits:DEFAULT_HITS,escapeBoost:DEFAULT_ESCAPE};
+export const defaultSettings={teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:DEFAULT_PROP_COUNT,decor:DEFAULT_DECOR,idleReveal:DEFAULT_IDLE,revealHits:DEFAULT_HITS,escapeBoost:DEFAULT_ESCAPE};
 const teams=['hunter','hider'];
 const integer=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)))):fallback;
 const decimal=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)*20)/20)):fallback;
@@ -30,6 +31,8 @@ export function sanitizeSettings(input={},previous=defaultSettings){
  if(['choose','auto'].includes(input.teamSelection))settings.teamSelection=input.teamSelection;
  if('objectCount'in input)settings.objectCount=integer(input.objectCount,MIN_PROP_COUNT,MAX_PROP_COUNT,settings.objectCount);
  if('decor'in input)settings.decor=decimal(input.decor,MIN_DECOR,MAX_DECOR,settings.decor);
+ // Sıfır kapalı demek; onun dışında saniye değeri sınırlanır.
+ if('idleReveal'in input)settings.idleReveal=Number(input.idleReveal)?integer(input.idleReveal,MIN_IDLE,MAX_IDLE,settings.idleReveal):0;
  if('revealHits'in input)settings.revealHits=integer(input.revealHits,MIN_HITS,MAX_HITS,settings.revealHits);
  if('escapeBoost'in input)settings.escapeBoost=decimal(input.escapeBoost,MIN_ESCAPE,MAX_ESCAPE,settings.escapeBoost);
  if(typeof input.swapTeams==='boolean')settings.swapTeams=input.swapTeams;
@@ -79,7 +82,8 @@ export function start(r,now=Date.now()){
  // Takımların eşit olması gerekmiyor: her tarafta en az bir kişi varsa tur başlar.
  if(teams.some(team=>count(r,team)<1))return {error:'Başlamak için en az bir saklanan ve bir avcı olmalı. Takım seç veya bot ekle.'};
  if((r.round||0)>0&&r.settings.swapTeams){for(const p of Object.values(r.players))p.team=p.role=p.team==='hunter'?'hider':'hunter';[r.settings.hunterBots,r.settings.hiderBots]=[r.settings.hiderBots,r.settings.hunterBots];}
- r.round=(r.round||0)+1;r.phase='prep';r.until=now+r.settings.hideSeconds*1000;r.winner=null;r.reason=null;r.shots=[];r.effects=[];r.results=[];r.events=[];r.objects=generateProps(r.settings.objectCount,r.settings.decor);r.initialObjects=r.objects.map(o=>({...o}));
+ r.round=(r.round||0)+1;r.phase='prep';r.until=now+r.settings.hideSeconds*1000;r.winner=null;r.reason=null;r.shots=[];r.effects=[];r.results=[];r.events=[];r.objects=generateProps(r.settings.objectCount,r.settings.decor);
+ for(const p of Object.values(r.players)){p.stillSpot=null;p.stillAt=now;p.leakAt=0;p.exposedUntil=0;}r.initialObjects=r.objects.map(o=>({...o}));
  let h=0,k=0;const spawned=[];
  for(const p of Object.values(r.players)){
   const i=p.team==='hunter'?h++:k++;let x=-3+(i%6)*1.2,z=p.team==='hunter'?-3-Math.floor(i/6)*1.1:10-Math.floor(i/6)*1.1;
@@ -131,6 +135,14 @@ export function decoy(r,p,now=Date.now()){
  for(const q of group)r.objects.push({id:ids.get(q.id),type:q.type,x:q.x,y:q.y||0,z:q.z,angle:q.angle,wet:q.wet,decoyOf:source.id,decoyRoot:rootId,...(ids.has(q.supportId)?{supportId:ids.get(q.supportId)}:{})});
  p.decoys--;p.locked=false;
  return {ok:true,decoys:p.decoys};
+}
+// Hiç kıpırdamadan aynı yerde bekleyen saklanan kendini ele verir: yerinin bir metre kadar
+// çevresinde kısa bir iz belirir. Avcılar ve o saklananın kendisi görür, diğer saklananlar görmez.
+// Süresi oda ayarıdır; sıfırlanması için kıpırdamak yeterli, yani kamp yapmak cezalı, oyun değil.
+function leak(r,p,now){
+ const angle=Math.random()*Math.PI*2,off=.55+Math.random()*.65;
+ r.effects??=[];r.effects.push({id:randomUUID(),kind:'idle',owner:p.id,x:p.x+Math.cos(angle)*off,y:0,z:p.z+Math.sin(angle)*off,at:now});
+ r.effects=r.effects.slice(-32);
 }
 function burst(r,p,now,kind='reveal'){
  r.effects??=[];r.effects.push({id:randomUUID(),kind,x:p.x,y:p.y||0,z:p.z,at:now});r.effects=r.effects.slice(-32);
@@ -280,6 +292,13 @@ export function tick(r,now,dt){
   }
   if(o){o.x=p.x;o.y=p.y;o.z=p.z;}
   if(p.team==='hunter'&&p.input.fire)shoot(r,p,now);
+  // Yer değiştirmek sayacı sıfırlar; yarım metre oynamak "kıpırdadım" saymaz.
+  if(!p.stillSpot||dist(p,p.stillSpot)>.5){p.stillSpot={x:p.x,z:p.z};p.stillAt=now;}
+  const idle=r.settings?.idleReveal|0;
+  if(idle&&r.phase==='play'&&p.team==='hider'&&p.propId&&now-(p.stillAt||now)>=idle*1000){
+   p.exposedUntil=now+2200;
+   if(now-(p.leakAt||0)>=3600){p.leakAt=now;leak(r,p,now);}
+  }
  }
  settleObjects(r,dt);
  if(r.phase==='play'){
@@ -298,10 +317,10 @@ export function view(r,id,now=Date.now()){
   players:Object.values(r.players).map(p=>{
    const own=p.id===id,teammate=p.team===me.team,transformed=!!p.propId;
    const visible=own||inMatch&&!blind&&(teammate||!transformed&&p.status==='alive'&&dist(eye,p)<35&&sight(eye,p));
-   return {id:p.id,name:p.name,bot:p.bot,team:p.team,role:p.team,status:p.status,visible:!!visible,...(visible?{x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch}:{}),...((own||teammate)&&inMatch?{propId:p.propId}:{}),...(own?{water:p.water,changes:p.changes,decoys:p.decoys,locked:p.locked,ammo:p.ammo,reloadUntil:p.reloadUntil}:{} )};
+   return {id:p.id,name:p.name,bot:p.bot,team:p.team,role:p.team,status:p.status,visible:!!visible,...(visible?{x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch}:{}),...((own||teammate)&&inMatch?{propId:p.propId}:{}),...(own?{water:p.water,changes:p.changes,decoys:p.decoys,locked:p.locked,ammo:p.ammo,reloadUntil:p.reloadUntil,exposed:p.exposedUntil>now,stillFor:p.stillAt?Math.round((now-p.stillAt)/1000):0}:{} )};
   }),
   objects:inMatch?objects.map(({id,type,x,y,z,angle,wet})=>({id,type,x,y:y||0,z,angle,wet})):[],
-  effects:blind?[]:(r.effects||[]).filter(e=>now-e.at<1800&&dist(eye,e)<35),
+  effects:blind?[]:(r.effects||[]).filter(e=>now-e.at<1800&&dist(eye,e)<35&&(e.kind!=='idle'||me.team==='hunter'||e.owner===id)),
   shots:blind?[]:(r.shots||[]).filter(s=>now-s.at<650),events:blind?[]:(r.events||[]).filter(e=>now-e.at<4500)
  };
  if(me.team==='hider'&&!me.propId&&['prep','play'].includes(r.phase))packet.nearby=(r.objects||[]).filter(o=>accessibleObject(r,me,o.id)).map(o=>({id:o.id,type:o.type,y:o.y||0,distance:objectDistance(me,o)})).sort((a,b)=>a.distance-b.distance);

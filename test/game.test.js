@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {player,start,tick,action,possess,shuffle,shoot,reload,view,sanitizeSettings,configureRoom,syncBots,setTeam,PREP_MS,ROUND_MS,SHOT_MS,RELOAD_MS,JUMP_SPEED,LIFT_MAX,HUNTER_SPEED,DEFAULT_HITS,DEFAULT_ESCAPE} from '../game.js';
+import {player,start,tick,action,possess,shuffle,shoot,reload,view,sanitizeSettings,configureRoom,syncBots,setTeam,PREP_MS,ROUND_MS,SHOT_MS,RELOAD_MS,JUMP_SPEED,LIFT_MAX,HUNTER_SPEED,DEFAULT_HITS,DEFAULT_ESCAPE,DEFAULT_IDLE} from '../game.js';
 import {free,propTypes,nearestHit,generateProps,zoneAt,zones,surfaceHeight,fixtures,fitsHome,DEFAULT_DECOR} from '../public/world.js';
 function room(size=1,botMode='off'){
  const r={code:'TEST',host:'a',phase:'lobby',settings:sanitizeSettings({teamSize:size,botMode,swapTeams:false}),players:{a:player('a','Avcı',false,'hunter'),b:player('b','Saklanan',false,'hider')}};
@@ -296,4 +296,43 @@ test('an emptier room is possible: no extra props and thinned decor still leaves
  // Oda ayarı gerçekten tura yansır.
  const r=room();r.phase='end';assert.ok(configureRoom(r,{objectCount:0,decor:.25},'a').ok);
  assert.ok(start(r,60000).ok);assert.ok(r.objects.length<full.length*.45,`turda ${r.objects.length} nesne`);
+});
+test('camping gives you away: an idle disguise leaks a trace, moving resets the clock',()=>{
+ const idles=r=>(r.effects||[]).filter(e=>e.kind==='idle');
+ const camp=scenario();camp.r.settings.idleReveal=15;possess(camp.r,camp.p,camp.o.id);
+ tick(camp.r,20000,.02);assert.equal(idles(camp.r).length,0,'sayaç yeni başladı');
+ tick(camp.r,20000+14000,.02);assert.equal(idles(camp.r).length,0,'süre dolmadan iz çıkmaz');
+ tick(camp.r,20000+15000,.02);
+ const leak=idles(camp.r);assert.equal(leak.length,1);assert.equal(leak[0].owner,camp.p.id);
+ assert.ok(Math.hypot(leak[0].x-camp.p.x,leak[0].z-camp.p.z)<1.35,'iz oyuncunun bir metre kadar çevresinde');
+ assert.equal(camp.p.status,'alive','iz eleme değil, ipucu');
+ // Aynı anda ikinci bir iz yağmuru olmaz: en az 3,6 saniye ara var.
+ tick(camp.r,20000+16000,.02);assert.equal(idles(camp.r).length,1);
+ // İzi avcı ve sahibi görür, başka bir saklanan görmez.
+ const at=20000+16000;
+ assert.equal(view(camp.r,'a',at).effects.filter(e=>e.kind==='idle').length,1,'avcı görür');
+ assert.equal(view(camp.r,'b',at).effects.filter(e=>e.kind==='idle').length,1,'sahibi uyarılır');
+ assert.equal(view(camp.r,'b',at).players.find(q=>q.id==='b').exposed,true);
+ camp.r.players.c=player('c','Diğer saklanan',false,'hider');camp.r.players.c.x=0;camp.r.players.c.z=9;
+ assert.equal(view(camp.r,'c',at).effects.filter(e=>e.kind==='idle').length,0,'diğer saklananlar göremez');
+ // Gerçekten yer değiştiren saklanan iz vermez: sayaç kıpırdadığı anda sıfırlanır. Yerinde
+ // titremek kıpırdamak sayılmaz, yoksa kamp yapan sağa sola oynayarak mekaniği boşa çıkarırdı.
+ const runner=scenario();runner.r.settings.idleReveal=15;possess(runner.r,runner.p,runner.o.id);
+ tick(runner.r,20000,.02);const from=runner.p.x;
+ for(let i=1;i<=12;i++){runner.p.input={x:1};runner.p.inputAt=20000+i*100;tick(runner.r,20000+i*100,.05);}
+ runner.p.input={};assert.ok(runner.p.x-from>.6,`yürüdü mü: ${(runner.p.x-from).toFixed(2)} m`);
+ tick(runner.r,21200+14000,.02);assert.equal(idles(runner.r).length,0,'kıpırdayan ele verilmez');
+ tick(runner.r,21200+15100,.02);assert.equal(idles(runner.r).length,1,'durunca sayaç yeniden işler');
+ const jiggle=scenario();jiggle.r.settings.idleReveal=15;possess(jiggle.r,jiggle.p,jiggle.o.id);
+ tick(jiggle.r,20000,.02);
+ for(let i=1;i<=155;i++){jiggle.p.input={x:i%2?1:-1};jiggle.p.inputAt=20000+i*100;tick(jiggle.r,20000+i*100,.05);}
+ assert.equal(idles(jiggle.r).length,1,'yerinde titremek kurtarmaz');
+ // Ayar: kapalıysa hiç iz çıkmaz, sınırlar kırpılır.
+ const off=scenario();off.r.settings.idleReveal=0;possess(off.r,off.p,off.o.id);
+ tick(off.r,20000,.02);tick(off.r,20000+120000,.02);assert.equal(idles(off.r).length,0,'kapalı ayar sessiz');
+ assert.equal(sanitizeSettings({idleReveal:0}).idleReveal,0);
+ assert.equal(sanitizeSettings({idleReveal:3}).idleReveal,10);
+ assert.equal(sanitizeSettings({idleReveal:900}).idleReveal,120);
+ assert.equal(sanitizeSettings({idleReveal:'x'}).idleReveal,0);
+ assert.equal(sanitizeSettings({}).idleReveal,DEFAULT_IDLE);
 });

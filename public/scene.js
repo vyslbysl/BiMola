@@ -8,12 +8,13 @@ export function createScene(container){
  // Intel HD/UHD gibi entegre kartlarda oyun kasıyordu. Kalite kademesi kartın adına göre seçilir,
  // kare süresi kötüyse kendini bir kademe daha aşağı çeker ve oyuncu menüden elle de seçebilir.
  // Pahalı olan üç şey kademelendi: gölge haritası, çözünürlük ve oda dolgu ışıkları.
- const QUALITY_KEY='mola-kalite',LEVELS=['high','medium','low'];
+ const QUALITY_KEY='mola-kalite',SHADOW_KEY='mola-golge',LEVELS=['high','medium','low'];
  const gpuName=(()=>{try{const c=document.createElement('canvas'),gl=c.getContext('webgl2')||c.getContext('webgl');const ext=gl?.getExtension('WEBGL_debug_renderer_info');return String(ext&&gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||'');}catch{return '';}})();
  const weakGpu=/swiftshader|llvmpipe|softwarerasterizer|basic render|hd graphics|uhd graphics|intel\(r\) hd|gma|mali-4|mali-t7|adreno \(tm\) [1-4]/i.test(gpuName);
  const saved=(()=>{try{return localStorage.getItem(QUALITY_KEY)||'';}catch{return '';}})();
  let autoQuality=!LEVELS.includes(saved);
  let quality=LEVELS.includes(saved)?saved:weakGpu?'low':'high';
+ let shadowsOn=(()=>{try{return localStorage.getItem(SHADOW_KEY)!=='0';}catch{return true;}})();
  const renderer=new THREE.WebGLRenderer({antialias:quality==='high',alpha:false,powerPreference:'high-performance'});
  renderer.setSize(innerWidth,innerHeight);renderer.toneMappingExposure=1.06;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.autoUpdate=false;container.appendChild(renderer.domElement);
  const camera=new THREE.PerspectiveCamera(66,innerWidth/innerHeight,.045,170);camera.rotation.order='YXZ';scene.add(camera);
@@ -97,12 +98,12 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   if(remember){try{localStorage.setItem(QUALITY_KEY,quality);}catch{}}
   const cap=quality==='high'?1.75:quality==='medium'?1.25:1,shrink=quality==='low'?.8:1;
   renderer.setPixelRatio(Math.max(.5,Math.min(window.devicePixelRatio||1,cap)*shrink*renderScale));
-  renderer.shadowMap.enabled=quality!=='low';
+  renderer.shadowMap.enabled=quality!=='low'&&shadowsOn;
   renderer.shadowMap.type=quality==='high'?THREE.PCFSoftShadowMap:THREE.PCFShadowMap;
   renderer.toneMapping=quality==='low'?THREE.LinearToneMapping:THREE.ACESFilmicToneMapping;
   const size=quality==='high'?3072:1536;
   if(sun.shadow.mapSize.x!==size){sun.shadow.map?.dispose();sun.shadow.map=null;sun.shadow.mapSize.set(size,size);}
-  sun.castShadow=quality!=='low';sun.shadow.radius=quality==='high'?3:1;
+  sun.castShadow=quality!=='low'&&shadowsOn;sun.shadow.radius=quality==='high'?3:1;
   shadowEvery=quality==='high'?1:3;occluderEvery=quality==='high'?1:quality==='medium'?2:3;
   // Düşük kademede ışık başına düşen kare maliyeti belirleyici: uzak odaların dolgusu kapanır.
   fillLights.forEach((light,i)=>light.visible=quality==='low'?i<2:true);
@@ -234,24 +235,28 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  function addShot(shot){if(seenShots.has(shot.id))return;seenShots.add(shot.id);if(seenShots.size>300)seenShots.delete(seenShots.values().next().value);if(!shot.from||!shot.to)return;const a=new THREE.Vector3(shot.from.x,shot.from.y??1.5,shot.from.z),b=new THREE.Vector3(shot.to.x,shot.to.y??.5,shot.to.z),g=new THREE.Group();if(shot.shooter===currentId&&gun.visible){gun.updateWorldMatrix(true,false);a.copy(gun.localToWorld(new THREE.Vector3(0,.023,-.345)));}const delta=b.clone().sub(a);const length=delta.length();if(length<.01)return;const streak=new THREE.Mesh(new THREE.CylinderGeometry(.013,.025,length,6),shootMat.clone());streak.position.copy(a).add(b).multiplyScalar(.5);streak.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());g.add(streak);for(let i=0;i<9;i++){const p=sphere(.023,b.x,b.y,b.z,m.water,g,.8,1.4,.8);p.userData.velocity=new THREE.Vector3((rand()-.5)*1.8,rand()*1.6,(rand()-.5)*1.8);}scene.add(g);shots.push({g,start:performance.now(),streak});}
  const revealEffects=[],seenEffects=new Set(),reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
  const shardGeometry=new THREE.OctahedronGeometry(.07),ringGeometry=new THREE.TorusGeometry(.6,.025,6,48);
+ const beamGeometry=new THREE.CylinderGeometry(.055,.19,1.7,10,1,true);
  function addEffect(effect,age=0){
   if(seenEffects.has(effect.id))return;seenEffects.add(effect.id);if(seenEffects.size>256)seenEffects.delete(seenEffects.values().next().value);
   if(age>1500)return;
   const g=new THREE.Group();g.position.set(effect.x,effect.y||0,effect.z);scene.add(g);
-  const material=new THREE.MeshStandardMaterial({color:effect.kind==='decoy'?'#a8ddd8':'#60cce6',transparent:true,opacity:.9,roughness:.23,metalness:.15});
+  const idle=effect.kind==='idle';
+  const material=new THREE.MeshStandardMaterial({color:effect.kind==='decoy'?'#a8ddd8':idle?'#efb851':'#60cce6',transparent:true,opacity:idle?.62:.9,roughness:.23,metalness:.15,side:idle?THREE.DoubleSide:THREE.FrontSide});
   const ring=new THREE.Mesh(ringGeometry,material);ring.rotation.x=-Math.PI/2;ring.position.y=.08;g.add(ring);
   const pieces=[];
-  for(let i=0;i<(reducedMotion?8:36);i++){const piece=new THREE.Mesh(shardGeometry,material);const angle=i*2.4;piece.position.set(Math.cos(angle)*.2,.45+(i%6)*.13,Math.sin(angle)*.2);piece.scale.set(.5+(i%3)*.35,1.6,1);piece.userData.start=piece.position.clone();piece.userData.velocity=new THREE.Vector3(Math.cos(angle)*(1+i%4*.3),1.5+i%5*.3,Math.sin(angle)*(1+i%4*.3));g.add(piece);pieces.push(piece);}
+  // İz bir patlama değil, bir işaret: kıymık saçmaz, yerinde nefes alan bir sütun bırakır.
+  if(idle){const beam=new THREE.Mesh(beamGeometry,material);beam.position.y=.85;g.add(beam);}
+  for(let i=0;i<(idle?0:reducedMotion?8:36);i++){const piece=new THREE.Mesh(shardGeometry,material);const angle=i*2.4;piece.position.set(Math.cos(angle)*.2,.45+(i%6)*.13,Math.sin(angle)*.2);piece.scale.set(.5+(i%3)*.35,1.6,1);piece.userData.start=piece.position.clone();piece.userData.velocity=new THREE.Vector3(Math.cos(angle)*(1+i%4*.3),1.5+i%5*.3,Math.sin(angle)*(1+i%4*.3));g.add(piece);pieces.push(piece);}
   let silhouette=null;
   if(effect.kind==='reveal'){
    silhouette=new THREE.Group();g.add(silhouette);
    const body=new THREE.Mesh(new THREE.CapsuleGeometry(.22,.55,4,12),material);body.position.y=.86;silhouette.add(body);
    const head=new THREE.Mesh(new THREE.SphereGeometry(.16,16,12),material);head.position.y=1.43;silhouette.add(head);
   }
-  revealEffects.push({g,ring,pieces,material,silhouette,start:performance.now()-Math.max(0,age)});
+  revealEffects.push({g,ring,pieces,material,silhouette,spread:idle?.65:reducedMotion?.5:2.2,start:performance.now()-Math.max(0,age)});
  }
  function clearEffect(fx){scene.remove(fx.g);fx.material.dispose();fx.silhouette?.children.forEach(o=>o.geometry.dispose());}
- function animateEffects(now){for(let i=revealEffects.length-1;i>=0;i--){const fx=revealEffects[i],age=(now-fx.start)/1000;if(age>=1.5){clearEffect(fx);revealEffects.splice(i,1);continue;}const k=age/1.5;fx.material.opacity=.9*(1-k);fx.ring.scale.setScalar(1+age*(reducedMotion?.5:2.2));for(const piece of fx.pieces){piece.position.copy(piece.userData.start).addScaledVector(piece.userData.velocity,reducedMotion?age*.15:age);piece.position.y=Math.max(.05,piece.position.y-age*age*1.8);piece.rotation.set(age*3,age*2,age);piece.scale.multiplyScalar(.994);}if(fx.silhouette){fx.silhouette.position.y=age*.25;fx.silhouette.scale.setScalar(1+Math.sin(Math.min(1,age*3)*Math.PI)*.12);}}}
+ function animateEffects(now){for(let i=revealEffects.length-1;i>=0;i--){const fx=revealEffects[i],age=(now-fx.start)/1000;if(age>=1.5){clearEffect(fx);revealEffects.splice(i,1);continue;}const k=age/1.5;fx.material.opacity=.9*(1-k);fx.ring.scale.setScalar(1+age*(fx.spread??(reducedMotion?.5:2.2)));for(const piece of fx.pieces){piece.position.copy(piece.userData.start).addScaledVector(piece.userData.velocity,reducedMotion?age*.15:age);piece.position.y=Math.max(.05,piece.position.y-age*age*1.8);piece.rotation.set(age*3,age*2,age);piece.scale.multiplyScalar(.994);}if(fx.silhouette){fx.silhouette.position.y=age*.25;fx.silhouette.scale.setScalar(1+Math.sin(Math.min(1,age*3)*Math.PI)*.12);}}}
  function sync(state,myId){currentState=state;currentId=myId;if(!state)return;for(const effect of state.effects||[])addEffect(effect,state.now-effect.at);updateObjects(state.objects||initialProps);const visibleIds=new Set();for(const p of state.players||[]){const team=p.role||p.team;if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||p.status==='found'||p.propId)continue;visibleIds.add(p.id);let g=people.get(p.id);if(g&&g.userData.team!==team){scene.remove(g);people.delete(p.id);g=null;}if(!g){g=avatar(team);g.position.set(p.x,p.y||0,p.z);people.set(p.id,g);}g.userData.target=new THREE.Vector3(p.x,p.y||0,p.z);g.userData.angle=p.yaw||0;g.visible=p.id!==myId;}for(const[id,g]of people)if(!visibleIds.has(id))g.visible=false;for(const shot of state.shots||[])addShot(shot);}
  const tempVec=new THREE.Vector3(),cameraTarget=new THREE.Vector3(),focus=new THREE.Vector3();
  let frameCount=0,frameSum=0,frameTicks=0;
@@ -317,6 +322,8 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  applyQuality(quality,false);
  const api={renderer,camera,sync,render,reset,kick:()=>{recoil=1;},pickObject,preview,
   quality:()=>quality,gpu:()=>gpuName,autoQuality:()=>autoQuality,
-  setQuality:name=>{renderScale=1;autoQuality=false;applyQuality(name,true);return quality;}};
+  setQuality:name=>{renderScale=1;autoQuality=false;applyQuality(name,true);return quality;},
+  shadows:()=>renderer.shadowMap.enabled,shadowsWanted:()=>shadowsOn,
+  setShadows:on=>{shadowsOn=!!on;try{localStorage.setItem(SHADOW_KEY,shadowsOn?'1':'0');}catch{}applyQuality(quality);return renderer.shadowMap.enabled;}};
  return api;
 }
