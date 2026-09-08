@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {player,start,tick,action,possess,shuffle,shoot,reload,view,sanitizeSettings,configureRoom,syncBots,setTeam,PREP_MS,ROUND_MS,SHOT_MS,RELOAD_MS,JUMP_SPEED,LIFT_MAX,HUNTER_SPEED,DEFAULT_HITS,DEFAULT_ESCAPE,DEFAULT_IDLE} from '../game.js';
 import {free,propTypes,nearestHit,generateProps,zoneAt,zones,surfaceHeight,fixtures,fitsHome,DEFAULT_DECOR} from '../public/world.js';
 function room(size=1,botMode='off'){
- const r={code:'TEST',host:'a',phase:'lobby',settings:sanitizeSettings({teamSize:size,botMode,swapTeams:false}),players:{a:player('a','Avcı',false,'hunter'),b:player('b','Saklanan',false,'hider')}};
+ const r={code:'TEST',host:'a',phase:'lobby',settings:sanitizeSettings({teamSize:size,botMode,swapTeams:false,mapRotate:false,objectCount:51,decor:1}),players:{a:player('a','Avcı',false,'hunter'),b:player('b','Saklanan',false,'hider')}};
  assert.equal(start(r,1000).ok,true);return r;
 }
 function play(r){r.phase='play';r.until=999999;for(const p of Object.values(r.players))p.inputAt=20000;return r;}
@@ -227,8 +227,10 @@ test('duvara asılı bir kılık düşmez, avcı da zıplayabilir',()=>{
 
 test('koltuğa gömülü minder kılığı kendi yerinde kalır, kaydırınca fırlamaz',()=>{
  const r=play(room());const p=r.players.b;
- const cushion=r.objects.find(o=>o.type==='seatPillow'&&o.supportId);
- assert.ok(cushion,'koltuğa gömülü bir minder var');
+ // Sahneyi elle kur: turun rastgele eşyaları minderin üstünü kapatınca kaldırma sınanamıyordu.
+ const sofa={...fixtures.find(o=>o.id==='sofa1')},cushion={...fixtures.find(o=>o.id==='sofa1-pillow-1')};
+ assert.ok(sofa&&cushion,'koltuk ve gömülü minderi var');
+ r.objects=[sofa,cushion];r.initialObjects=r.objects.map(o=>({...o}));
  const home=cushion.y,host=cushion.supportId;
  p.x=cushion.x;p.z=cushion.z;p.y=cushion.y;
  assert.ok(possess(r,p,cushion.id).ok);
@@ -245,17 +247,22 @@ test('koltuğa gömülü minder kılığı kendi yerinde kalır, kaydırınca f�
 
 test('Q ile dönüşüm bulunduğun yere yakışan eşyalarla sınırlı kalır',()=>{
  const r=play(room());const p=r.players.b;
- const onFloor=r.objects.find(o=>!o.supportId&&!o.owner&&(o.y||0)<.2&&propTypes[o.type]&&!propTypes[o.type].large);
- assert.ok(onFloor,'yerde duran bir eşya var');
- p.x=onFloor.x;p.z=onFloor.z;p.y=onFloor.y||0;
- assert.ok(possess(r,p,onFloor.id).ok);
+ // Dar bir köşede hiç yakışan tip kalmayabilir ve dönüşüm reddedilir; o yüzden birkaç yer denenir.
+ // Aranan garanti şu: dönüşüm gerçekleştiyse yeni tip kesinlikle yerde durabilen bir eşyadır.
+ const floors=r.objects.filter(o=>!o.supportId&&!o.owner&&(o.y||0)<.2&&propTypes[o.type]&&!propTypes[o.type].large);
+ assert.ok(floors.length,'yerde duran eşyalar var');
  let seen=0;
- for(let i=0;i<14;i++){
-  p.changes=3;const res=shuffle(r,p);if(!res.ok)continue;seen++;
-  assert.ok(fitsHome(res.type,'floor'),`${res.type} yerde durabilecek bir eşya olmalı`);
-  assert.ok(!['seatPillow','mug','plate','placemat','flatBook','knife'].includes(res.type),`${res.type} yerde durmaz`);
+ for(const onFloor of floors.slice(0,10)){
+  p.propId=null;p.locked=false;p.x=onFloor.x;p.z=onFloor.z;p.y=onFloor.y||0;
+  if(!possess(r,p,onFloor.id).ok)continue;
+  for(let i=0;i<6;i++){
+   p.changes=3;const res=shuffle(r,p);if(!res.ok)continue;seen++;
+   assert.ok(fitsHome(res.type,'floor'),`${res.type} yerde durabilecek bir eşya olmalı`);
+   assert.ok(!['seatPillow','mug','plate','placemat','flatBook','knife'].includes(res.type),`${res.type} yerde durmaz`);
+  }
+  if(seen)break;
  }
- assert.ok(seen>0,'en az bir dönüşüm denendi');
+ assert.ok(seen>0,'en az bir dönüşüm gerçekleşti');
  const onTop=r.objects.find(o=>o.type==='mug'&&!o.owner);
  if(onTop){
   const q=player('c','C',false,'hider');r.players.c=q;q.x=onTop.x;q.z=onTop.z;q.y=onTop.y;
@@ -292,7 +299,7 @@ test('an emptier room is possible: no extra props and thinned decor still leaves
  assert.equal(sanitizeSettings({objectCount:-5,decor:9}).objectCount,0);
  assert.equal(sanitizeSettings({decor:9}).decor,1);
  assert.equal(sanitizeSettings({decor:.01}).decor,.25);
- assert.equal(sanitizeSettings({decor:'x'}).decor,DEFAULT_DECOR);
+ assert.equal(sanitizeSettings({decor:'x'}).decor,.25,'bozuk değer oda varsayılanına döner');
  // Oda ayarı gerçekten tura yansır.
  const r=room();r.phase='end';assert.ok(configureRoom(r,{objectCount:0,decor:.25},'a').ok);
  assert.ok(start(r,60000).ok);assert.ok(r.objects.length<full.length*.45,`turda ${r.objects.length} nesne`);

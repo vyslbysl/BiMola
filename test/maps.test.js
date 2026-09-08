@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MAPS,MAP_CHOICES,mapTypes} from '../public/maps.js';
 import {generateProps,free,groundAt,mapFor,propTypes,pathTo,nearestHit,sight} from '../public/world.js';
-import {player,start,tick,view,sanitizeSettings,configureRoom} from '../game.js';
+import {player,start,tick,view,sanitizeSettings,configureRoom,defaultSettings} from '../game.js';
 function make(mapId,teamSize=3){const r={host:'a',phase:'lobby',settings:sanitizeSettings({mapId,teamSize,botMode:'fill',swapTeams:false}),players:{a:player('a','Avcı',false,'hunter')}};assert.equal(start(r,1000).ok,true);return r;}
 test('all six maps are selectable and each new map has its own valid, supported inventory',()=>{
  assert.equal(MAP_CHOICES.length,6);
@@ -50,4 +50,26 @@ test('both museum ramps are walkable, navigable by bots, and cannot be bypassed 
 });
 test('preparation packets preserve hidden ownership on every map',()=>{
  for(const id of Object.keys(MAPS)){const r=make(id);const h=Object.values(r.players).find(p=>p.team==='hider');h.propId=r.objects[0].id;r.objects[0].owner=h.id;const packet=view(r,'a',2000);assert.equal(packet.players.find(p=>p.id===h.id).x,undefined);assert.ok(packet.objects.every(o=>!('owner'in o)&&!('mapId'in o)));}
+});
+test('teams swap and so does the venue: the map rotates each round unless the host pins or disables it',()=>{
+ assert.equal(defaultSettings.mapRotate,true);
+ // Varsayılan kurulum en seyrek yoğunlukta gelir.
+ assert.equal(defaultSettings.objectCount,10);assert.equal(defaultSettings.decor,.25);
+ const r=make('market');assert.equal(r.settings.mapId,'market');
+ r.phase='end';assert.ok(start(r,30000).ok);
+ assert.notEqual(r.settings.mapId,'market','yeni tur yeni mekân');
+ assert.equal(mapFor(r.objects).id,r.settings.mapId,'nesneler yeni haritaya ait');
+ assert.ok(r.events.some(e=>/Yeni mekân/.test(e.text)),'oyuncular haberdar edilir');
+ const seen=new Set([r.settings.mapId]);
+ for(let i=0;i<30;i++){const before=r.settings.mapId;r.phase='end';start(r,40000+i*1000);
+  assert.notEqual(r.settings.mapId,before,'aynı harita üst üste gelmez');seen.add(r.settings.mapId);}
+ assert.ok(seen.size>=4,`rastgele dolaşıyor: ${[...seen]}`);
+ // Kurucu elle seçerse sıradaki tur onda başlar, rotasyon ondan sonra devralır.
+ const pick=MAP_CHOICES.map(m=>m.id).find(id=>id!==r.settings.mapId);
+ r.phase='end';assert.ok(configureRoom(r,{mapId:pick},'a').ok);start(r,90000);
+ assert.equal(r.settings.mapId,pick,'kurucunun seçtiği harita korunur');assert.equal(mapFor(r.objects).id,pick);
+ r.phase='end';start(r,95000);assert.notEqual(r.settings.mapId,pick,'sonraki turda rotasyon devralır');
+ // Kapatılırsa mekân sabit kalır.
+ r.phase='end';assert.ok(configureRoom(r,{mapRotate:false},'a').ok);const pinned=r.settings.mapId;
+ for(let i=0;i<6;i++){r.phase='end';start(r,100000+i*1000);assert.equal(r.settings.mapId,pinned,'rotasyon kapalı');}
 });

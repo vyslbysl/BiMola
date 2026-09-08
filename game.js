@@ -1,4 +1,4 @@
-import {validMap} from './public/maps.js';
+import {validMap,MAP_CHOICES} from './public/maps.js';
 import {assembly,moveAssembly,detachChildren,settleObjects} from './public/physics.js';
 import {randomUUID} from 'node:crypto';
 import {mapFor,groundAt,free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,DEFAULT_DECOR,MIN_DECOR,MAX_DECOR,contains,homeKind,fitsHome} from './public/world.js';
@@ -6,6 +6,7 @@ export {dist};
 // Kaç isabetin bir saklananı ortaya çıkardığı ve ıslanan saklananın kaçış hızı artık oda
 // ayarıdır; buradaki değerler yalnızca varsayılan.
 export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPEED=4.3;
+export const LEAN_PROP_COUNT=10;
 export const DEFAULT_IDLE=30,MIN_IDLE=10,MAX_IDLE=120;
 export const DEFAULT_HITS=3,MIN_HITS=1,MAX_HITS=10,DEFAULT_ESCAPE=1.1,MIN_ESCAPE=1,MAX_ESCAPE=2;
 // Hiders can hop onto counters, tables and beds: JUMP_SPEED clears the 1 m kitchen counter with
@@ -17,7 +18,7 @@ export const DEFAULT_HITS=3,MIN_HITS=1,MAX_HITS=10,DEFAULT_ESCAPE=1.1,MIN_ESCAPE
 // için orada bırakılan nesne görülebilir kalır. Duvara asılı parçalar (tablo, perde, duvar rafı)
 // LIFT_MAX_MOUNTED'e kadar çıkar; onlar duvarda durması beklenen, göz alıcı parçalar.
 export const GRAVITY=18,JUMP_SPEED=6.6,SPIN_SPEED=2.4,LIFT_SPEED=1.4,LIFT_MAX=2.2,LIFT_MAX_MOUNTED=3.4;
-export const defaultSettings={mapId:'loft',teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:DEFAULT_PROP_COUNT,decor:DEFAULT_DECOR,idleReveal:DEFAULT_IDLE,revealHits:DEFAULT_HITS,escapeBoost:DEFAULT_ESCAPE};
+export const defaultSettings={mapId:'loft',mapRotate:true,teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:LEAN_PROP_COUNT,decor:MIN_DECOR,idleReveal:DEFAULT_IDLE,revealHits:DEFAULT_HITS,escapeBoost:DEFAULT_ESCAPE};
 const teams=['hunter','hider'];
 const integer=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)))):fallback;
 const decimal=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)*20)/20)):fallback;
@@ -25,6 +26,7 @@ export function sanitizeSettings(input={},previous=defaultSettings){
  input=input&&typeof input==='object'?input:{};
  const settings={...defaultSettings,...previous};
  if(validMap(input.mapId))settings.mapId=input.mapId;
+ if('mapRotate'in input)settings.mapRotate=!!input.mapRotate;
  if('teamSize'in input)settings.teamSize=integer(input.teamSize,1,12,settings.teamSize);
  if(['off','fill','custom'].includes(input.botMode))settings.botMode=input.botMode;
  for(const key of ['hunterBots','hiderBots'])settings[key]=integer(input[key]??settings[key],0,settings.teamSize,0);
@@ -65,6 +67,7 @@ export function configureRoom(r,changes={},actor){
   if(humans>settings.teamSize)return {error:'Bu takımda seçilen kapasiteden fazla oyuncu var. Önce oyuncuları diğer takıma taşı.'};
   if(settings.botMode==='custom'&&settings[team+'Bots']+humans>settings.teamSize)return {error:'Oyuncu ve bot sayısı takım kapasitesini aşıyor.'};
  }
+ if(settings.mapId!==r.settings.mapId)r.mapPinned=true;
  r.settings=settings;syncBots(r);return {ok:true,settings:r.settings};
 }
 export function setTeam(r,id,team,actor=id){
@@ -84,7 +87,15 @@ export function start(r,now=Date.now()){
  // Takımların eşit olması gerekmiyor: her tarafta en az bir kişi varsa tur başlar.
  if(teams.some(team=>count(r,team)<1))return {error:'Başlamak için en az bir saklanan ve bir avcı olmalı. Takım seç veya bot ekle.'};
  if((r.round||0)>0&&r.settings.swapTeams){for(const p of Object.values(r.players))p.team=p.role=p.team==='hunter'?'hider':'hunter';[r.settings.hunterBots,r.settings.hiderBots]=[r.settings.hiderBots,r.settings.hunterBots];}
+ // Takımlar yer değiştirirken mekân da değişir: aynı odayı ezberleyen taraf avantaj kazanmasın.
+ // Kurucu isterse ayarı kapatıp tek haritada kalabilir.
+ if((r.round||0)>0&&r.settings.mapRotate&&!r.mapPinned){
+  const others=MAP_CHOICES.map(m=>m.id).filter(id=>id!==r.settings.mapId);
+  if(others.length){r.settings.mapId=others[Math.floor(Math.random()*others.length)];r.mapChanged=true;}
+ }else r.mapChanged=false;
+ r.mapPinned=false;
  r.round=(r.round||0)+1;r.phase='prep';r.until=now+r.settings.hideSeconds*1000;r.winner=null;r.reason=null;r.shots=[];r.effects=[];r.results=[];r.events=[];r.objects=generateProps(r.settings.objectCount,r.settings.decor,r.settings.mapId);
+ if(r.mapChanged){r.mapChanged=false;notice(r,`Yeni mekân: ${MAP_CHOICES.find(m=>m.id===r.settings.mapId)?.name||r.settings.mapId}`,now);}
  for(const p of Object.values(r.players)){p.stillSpot=null;p.stillAt=now;p.leakAt=0;p.exposedUntil=0;}r.initialObjects=r.objects.map(o=>({...o}));
  let h=0,k=0;const spawned=[];
  for(const p of Object.values(r.players)){

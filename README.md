@@ -15,7 +15,9 @@ npm start
 
 ## Haritalar
 
-**Kendi odanı kur → Harita** bölümünden seçim yapılır. **Hemen oyna** ekranında da harita seçilerek botlarla denenebilir. Oda sahibi haritayı lobide veya tur bitiminde değiştirebilir; devam eden tur sırasında değiştiremez. Mevcut Güneşli Ev korunur.
+**Kendi odanı kur → Harita** bölümünde haritalar önizlemeli kartlar olarak seçilir; **Hemen oyna** ekranında da aynı kartlar vardır. Oda sahibi haritayı lobide veya tur bitiminde değiştirebilir; devam eden tur sırasında değiştiremez. Mevcut Güneşli Ev korunur.
+
+**Turlar arasında harita değişimi varsayılan olarak açıktır:** yeni turda takımlar yer değiştirirken mekân da rastgele değişir (aynı harita üst üste gelmez), böylece bir odayı ezberleyen taraf avantaj kazanmaz. Kurucu tur bitiminde bir harita seçerse o tur onun seçtiği haritada başlar, rotasyon sonraki turda devralır; "Hep aynı haritada kal" seçilirse mekân sabitlenir.
 
 - **Kıyı Pazarı:** çizgili tenteli tezgâhlar, meyve kasaları, çeşmeli meydan ve kahve köşesi.
 - **Çatı Serası:** cam sera, bitki kasaları, bakım masaları ve çatı terası. Cam suyu durdurur; görüşü kesmez. Kuzey, güney ve yan çıkışlar vardır.
@@ -31,8 +33,8 @@ Her haritanın mimarisi, nesne havuzu ve bot yolları ayrıdır. Eşya değişim
 - Bot yok / boş yerleri doldur / iki takım için ayrı bot sayısı.
 - 10–60 saniye saklanma; 1–10 dakika tur.
 - **Kıpırdamayanın izi (15 · 30 · 45 · 60 saniye · kapalı):** bir saklanan bu kadar süre yer değiştirmezse yerinin ~1 m çevresinde 1,5 saniyelik amber bir iz (halka + ince ışık sütunu) belirir. Yalnızca avcılar ve o saklananın kendisi görür; diğer saklananlara sızmaz. Yarım metreden fazla yer değiştirmek sayacı sıfırlar — yerinde titremek kurtarmaz. Aynı oyuncu için izler arasında en az 3,6 saniye vardır, yani iz yağmuru olmaz ve iz eleme değil ipucudur. Saklanan önce "5 saniye içinde kıpırdamazsan" uyarısını, sonra iz çıktığında ikinci uyarıyı alır.
-- **Süs eşyası yoğunluğu (tam · orta · az · çok az):** tezgah, masa ve duvarlardaki küçük süslerin ne kadarı doğsun. Mobilya, tezgah ve üstünde başka bir şey taşıyan parçalar her kademede yerinde kalır; yalnızca üstünde bir şey olmayan küçük süsler seyreltilir, yani odalar kimliğini kaybetmez. Tam kademede oda ~297 nesneyle açılır, en seyrek kademede ~110'a iner — zayıf ekran kartlarında en büyük ikinci kazanç budur.
-- **Ek rastgele eşya (0–90):** her tur serpilen ekstra eşya sayısı. **Hiç** seçilirse oda yalnızca mobilyasıyla ve her odanın imza parçasıyla (mutfakta kütük masa, salonda duvar tablosu) kalır.
+- **Süs eşyası yoğunluğu (tam · orta · az · çok az, varsayılan çok az):** tezgah, masa ve duvarlardaki küçük süslerin ne kadarı doğsun. Mobilya, tezgah ve üstünde başka bir şey taşıyan parçalar her kademede yerinde kalır; yalnızca üstünde bir şey olmayan küçük süsler seyreltilir, yani odalar kimliğini kaybetmez. Varsayılan (çok az süs + 10 ek eşya) kurulumda oda ~120 nesneyle açılır; tam süs ve bol eşyayla ~340'a çıkar — zayıf ekran kartlarında en büyük ikinci kazanç budur.
+- **Ek rastgele eşya (0–90, varsayılan 10):** her tur serpilen ekstra eşya sayısı. **Hiç** seçilirse oda yalnızca mobilyasıyla ve her odanın imza parçasıyla (mutfakta kütük masa, salonda duvar tablosu) kalır.
 - **Islatma dayanıklılığı (1–10 isabet, varsayılan 3):** saklanan bir oyuncunun açığa çıkması için gereken isabet sayısı. Her isabet %100'ün bu paya bölünmüş kadarını doldurur (3 isabette %34), son gereken isabet tam %100'e oturur. Gerçek eşyalara her ayarda tek atış yeter.
 - **Islanınca kaçış hızı (1×–2×, varsayılan 1.1×):** ilk isabeti yiyen saklananın avcıya göre kaçış hızı. 1× seçilirse iki taraf aynı hızda koşar.
 - Oyuncular takım seçebilir veya otomatik dağıtılır.
