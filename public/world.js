@@ -22,13 +22,13 @@ export const propTypes={
  ball:{name:'Plaj topu',radius:.29,height:.58,color:'#e8a949',icon:'◒'},
  watering:{name:'Sulama kabı',radius:.35,height:.48,color:'#e5b24e',icon:'◔'},
  ottoman:{name:'Puf',radius:.5,height:.5,color:'#dfa178',icon:'▰'},
- case:{name:'Valiz',radius:.4,height:.83,color:'#75a0b0',icon:'▣'},
- speaker:{name:'Hoparlör',radius:.27,height:.58,color:'#667674',icon:'▥'},
+ case:{w:.55,d:.32,name:'Valiz',radius:.4,height:.83,color:'#75a0b0',icon:'▣'},
+ speaker:{w:.4,d:.30,name:'Hoparlör',radius:.27,height:.58,color:'#667674',icon:'▥'},
  mug:{name:'Kupa',radius:.15,height:.16,color:'#eee9df',icon:'◉'},
- bookstack:{name:'Kitap yığını',radius:.16,height:.13,color:'#c1805e',icon:'▦'},
- logTable:{name:'Kütük masa',radius:1,height:.78,color:'#8a6339',icon:'⊞',under:.62},
- painting:{name:'Tablo',radius:.55,height:1.3,color:'#5c4530',icon:'◫'},
- pillow:{name:'Yastık',radius:.33,height:.2,color:'#e8dfcc',icon:'▱'},
+ bookstack:{w:.24,d:.18,name:'Kitap yığını',radius:.16,height:.13,color:'#c1805e',icon:'▦'},
+ logTable:{w:2,d:1.1,name:'Kütük masa',radius:1,height:.78,color:'#8a6339',icon:'⊞',under:.62},
+ painting:{w:1.1,d:.1,name:'Tablo',radius:.55,height:1.3,color:'#5c4530',icon:'◫'},
+ pillow:{w:.62,d:.44,name:'Yastık',radius:.33,height:.2,color:'#e8dfcc',icon:'▱'},
 };
 export function staticObstacles(){return walls.map(([x,z,w,d])=>[x,z,w,d,ROOM.height,0]);}
 // Five themed rooms open onto the central hallway. Every round scrambles which object sits where
@@ -193,8 +193,14 @@ export function free(x,z,radius=.28,objects=fixtures,ignoreId=null,y=0,height=BO
  return !objects.some(o=>{
   if(o.id===ignoreId||o.decoyOf===ignoreId||ignoreIds.has(o.id))return false;
   const t=propTypes[o.type];if(!t||t.flat)return false;
-  const base=o.y||0;if(base+t.height<=clear||base>=top-.025||t.under&&top<=base+t.under)return false;
-  return shape?overlaps(mover,o):contains(o,x,z,radius*.85);
+  const base=o.y||0;if(base+t.height<=clear||base>=top-.025)return false;
+  return hitParts(o).some(part=>{
+   if(base+part.y+part.h<=clear||base+part.y>=top-.025)return false;
+   const a=o.angle||0,c=Math.cos(a),s=Math.sin(a),solid={x:o.x+c*part.x+s*part.z,z:o.z-s*part.x+c*part.z,angle:a};
+   if(shape)return overlapSized(mover,size,solid,{w:part.w,d:part.d});
+   const q=localPoint(solid,x,z),dx=Math.max(0,Math.abs(q.x)-part.w/2),dz=Math.max(0,Math.abs(q.z)-part.d/2);
+   return dx*dx+dz*dz<radius*radius;
+  });
  });
 }
 function overlapSized(a,A,b,B){
@@ -225,6 +231,7 @@ export function pathTo(from,to,objects=fixtures){const map=mapFor(objects),level
 
 export function hitParts(o){
  const t=propTypes[o.type],d=dimensions(o),f=t.f;
+ if(t.model==='chair')return [{x:0,y:.44,z:0,w:.62,h:.08,d:.62},{x:0,y:.6,z:.25,w:.62,h:.38,d:.07},...[-1,1].flatMap(x=>[-1,1].map(z=>({x:x*.28,y:0,z:z*.265,w:.09,h:.44,d:.09})))];
  if(t.model==='stall')return [{x:0,y:.77,z:0,w:d.w,h:.13,d:d.d},{x:0,y:2.55,z:0,w:d.w,h:.25,d:d.d},...[-1,1].flatMap(x=>[-1,1].map(z=>({x:x*1.625,y:0,z:z*.75,w:.07,h:2.7,d:.07}))),{x:0,y:0,z:.8,w:d.w,h:.75,d:.04}];
  if(t.model==='exhibitShelf')return [{x:0,y:0,z:-.305,w:2.5,h:1.8,d:.04},...[-1,1].map(x=>({x:x*1.22,y:0,z:0,w:.055,h:1.8,d:.65})),...[.12,.65,1.18,1.73].map(y=>({x:0,y:y-.0275,z:0,w:2.5,h:.055,d:.65}))];
  if(f?.type==='shelf')return [{x:f.x<0?-d.w/2+.025:d.w/2-.025,y:0,z:0,w:.05,h:d.h,d:d.d},...Array.from({length:5},(_,i)=>({x:0,y:.13+i*(d.h-.16)/4,z:0,w:d.w,h:.045,d:d.d})),...[-1,1].map(sign=>({x:0,y:0,z:sign*(d.d/2-.025),w:d.w,h:d.h,d:.05}))];

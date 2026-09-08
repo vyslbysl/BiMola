@@ -53,3 +53,33 @@ test('dynamic inventory, including fixtures, is sanitized in hunter packets',()=
  const r=room(),p=r.players.b;p.x=5;p.z=1;assert.ok(possess(r,p,'dining').ok);assert.ok(action(r,p,{kind:'decoy'},1000).ok);
  const packet=view(r,'a',1000);for(const o of packet.objects)for(const key of ['owner','supportId','decoyOf','decoyRoot'])assert.ok(!(key in o),key);
 });
+test('a floor plate cannot acquire a wardrobe or another floor object as a passenger',()=>{
+ const plate={id:'plate',type:'plate',x:8,y:0,z:-6,angle:0},wardrobe={id:'wardrobe',type:'f_wardrobe',x:8,y:0,z:-6,angle:0};
+ assert.deepEqual(assembly([plate,wardrobe],plate).map(o=>o.id),['plate']);
+ const r={objects:[plate,wardrobe],players:{}};assert.equal(moveAssembly(r,plate,{x:8,y:.2,z:-6,angle:0}),false);near(wardrobe.y,0);
+});
+test('an explicit child does not attach to a different surface at the same height',()=>{
+ const left={id:'left',type:'f_coffee',x:8,y:0,z:-6,angle:0},right={...left,id:'right'},cup={id:'cup',type:'mug',x:8,y:.48,z:-6,angle:0,supportId:'left'};
+ assert.deepEqual(assembly([left,right,cup],right).map(o=>o.id),['right']);
+});
+test('round body clears an object corner but cannot cut through its edge',()=>{
+ const o={id:'cabinet',type:'washer',mapId:'market',x:0,y:0,z:0,angle:0};
+ assert.ok(free(.73,.65,.28,[o]));assert.equal(free(.6,.5,.28,[o]),false);
+ o.angle=Math.PI/2;assert.ok(free(.65,.73,.28,[o]));
+});
+test('small disguises pass under a table while still colliding with its legs',()=>{
+ const table={id:'table',type:'f_dining',mapId:'market',x:0,y:0,z:0,angle:0};
+ assert.ok(free(0,0,.1,[table],null,0,.16));assert.equal(free(2,.9,.1,[table],null,0,.16),false);
+});
+test('a disguised player bound to another support is not moved separately from their prop',()=>{
+ const left={id:'left',type:'f_coffee',x:8,y:0,z:-6,angle:0},right={...left,id:'right'},cup={id:'cup',type:'mug',x:8,y:.48,z:-6,angle:0,supportId:'left',owner:'a'},p=player('a','A');
+ Object.assign(p,{x:8,y:.48,z:-6,propId:'cup'});const r={objects:[left,right,cup],players:{a:p}};
+ moveAssembly(r,right,{x:9,y:0,z:-6,angle:0},{check:false});near(p.x,cup.x);near(p.x,8);
+});
+
+test('raising a plate under a table cannot hop through the tabletop',()=>{
+ const r=room(),p=r.players.b;
+ r.objects=[{id:'table',type:'f_dining',mapId:'market',x:0,z:7,y:0,angle:0},{id:'plate',type:'plate',mapId:'market',x:0,z:7,y:.5,angle:0,owner:p.id}];
+ Object.assign(p,{propId:'plate',x:0,z:7,y:.5,input:{lift:1},grounded:false});
+ for(let i=0;i<40;i++){p.inputAt=1000+i*25;tick(r,p.inputAt,.025);assert.ok(p.y<.75,'plate must stay below the solid tabletop');}
+});

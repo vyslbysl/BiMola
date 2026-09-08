@@ -1,3 +1,4 @@
+import {weaponPose,toward} from './public/weapon.js';
 import {validMap,MAP_CHOICES} from './public/maps.js';
 import {assembly,moveAssembly,detachChildren,settleObjects} from './public/physics.js';
 import {randomUUID} from 'node:crypto';
@@ -99,7 +100,7 @@ export function start(r,now=Date.now()){
  for(const p of Object.values(r.players)){p.stillSpot=null;p.stillAt=now;p.leakAt=0;p.exposedUntil=0;}r.initialObjects=r.objects.map(o=>({...o}));
  let h=0,k=0;const spawned=[];
  for(const p of Object.values(r.players)){
-  const i=p.team==='hunter'?h++:k++;let x=-3+(i%6)*1.2,z=p.team==='hunter'?-3-Math.floor(i/6)*1.1:10-Math.floor(i/6)*1.1;
+  const i=p.team==='hunter'?h++:k++;let x=(i%3-1)*.85,z=p.team==='hunter'?-3-Math.floor(i/3)*.95:10-Math.floor(i/6)*1.1;
   // Hiders start spread around the rooms, one room after another, so everybody opens the round with
   // something within reach. Hunters keep their huddle in the hallway, where they wait out the count.
   if(p.team==='hider'){
@@ -179,10 +180,13 @@ export function action(r,p,data,now=Date.now()){
 export function shoot(r,p,now=Date.now()){
  if(!p||r.phase!=='play'||p.team!=='hunter'||p.status!=='alive'||p.reloadUntil>now||now-p.lastShot<SHOT_MS||p.ammo<4)return false;
  p.lastShot=now;p.ammo-=4;
- const pitch=Math.max(-1.35,Math.min(1.35,p.pitch||0));
- const direction={x:-Math.sin(p.yaw)*Math.cos(pitch),y:Math.sin(pitch),z:-Math.cos(p.yaw)*Math.cos(pitch)},from={x:p.x,y:1.62+(p.y||0),z:p.z};
- const bodies=Object.values(r.players).filter(q=>q.id!==p.id&&q.status==='alive'&&!q.propId);
- const hit=nearestHit(from,direction,r.objects,bodies);
+ const pose=weaponPose(p),bodies=Object.values(r.players).filter(q=>q.id!==p.id&&q.status==='alive'&&!q.propId);
+ const aim=nearestHit(pose.eye,pose.direction,r.objects,bodies);
+ // The reticle picks the aim point; water must still travel from the physical barrel.
+ const clearance=nearestHit(pose.eye,toward(pose.eye,pose.muzzle),r.objects,bodies);
+ const span=Math.hypot(pose.muzzle.x-pose.eye.x,pose.muzzle.y-pose.eye.y,pose.muzzle.z-pose.eye.z);
+ const obstructed=clearance.distance<span,from=obstructed?clearance.point:pose.muzzle;
+ const hit=obstructed?clearance:nearestHit(from,toward(from,aim.point),r.objects,bodies);
  r.shots.push({id:randomUUID(),from,to:hit.point,at:now,shooter:p.id});r.shots=r.shots.slice(-100);
  let target,o,wet,objectName;
  if(hit.kind==='object'){
@@ -289,6 +293,8 @@ export function tick(r,now,dt){
      if(attempt(p.x,p.z,p.y+inc)){delete o.supportId;o.anchored=false;continue;}
      // Koltuğa gömülü bir minder aradaki yüksekliklere sığmaz; küçük adım engellenirse bir
      // sonraki boş yüksekliğe atlar, yani eşya yüzeyin üstüne çıkar.
+     const ignored=new Set(assembly(r.objects,o).map(item=>item.id));
+     if(free(p.x,p.z,radius,r.objects,o.id,p.y,tall,o,ignored))break;
      let hopped=false;
      for(let k=2;k<=12&&!hopped;k++)hopped=attempt(p.x,p.z,Math.max(0,Math.min(ceiling,p.y+inc*k)));
      if(!hopped)break;
@@ -304,7 +310,7 @@ export function tick(r,now,dt){
     // kalır: yerçekimi onları yukarı fırlatmaz, yalnızca yukarıdaysa aşağı çeker.
     const resting=Math.min(ground,p.y);
     p.vy-=GRAVITY*dt;const ny=Math.max(resting,p.y+p.vy*dt);
-    if(o){if(!attempt(p.x,p.z,ny))p.vy=0;}else p.y=ny;
+    if(!attempt(p.x,p.z,ny))p.vy=0;
     if(p.y<=resting+.005){p.vy=0;p.grounded=true;}else p.grounded=false;
    }
   }
