@@ -96,6 +96,10 @@ const decorLeaves=fixtures.filter(f=>(f.supportId||propTypes[f.type]?.mounted)&&
 // Anything at or below this height can be jumped on and stood upon; taller pieces (shelves,
 // wardrobe) stay pure obstacles.
 export const STAND_MAX_HEIGHT=1.05,STAND_MIN_RADIUS=.34,BODY_HEIGHT=1.75;
+// Eğilen avcının gövde yüksekliği. Yalnızca su atışının çarptığı kutuyu küçültür: eğilen bir
+// avcının üstünden takım arkadaşının suyu geçebilsin. free() bilerek her zaman BODY_HEIGHT
+// kullanır — eğilmek yürüme çarpışmasını değiştirmez, yoksa avcı dar boşluklara sızardı.
+export const CROUCH_BODY_HEIGHT=1.1;
 // What is underfoot at this spot: the tallest thing short enough to climb. Furniture counts, and so
 // do the broader props — a pouf, a suitcase, a laundry basket or the log table are all wide enough
 // to perch on, while a mug or a stack of books is not.
@@ -224,7 +228,7 @@ export function nearestHit(origin,direction,objects,players=[]){let hit={distanc
   const localOrigin={x:p.x,y:origin.y-(o.y||0),z:p.z},localDirection={x:direction.x*c-direction.z*s,y:direction.y,z:direction.x*s+direction.z*c};
   for(const part of hitParts(o)){const d=rayBox(localOrigin,localDirection,{min:{x:part.x-part.w/2,y:part.y,z:part.z-part.d/2},max:{x:part.x+part.w/2,y:part.y+part.h,z:part.z+part.d/2}});if(d!==null&&d<hit.distance)hit={distance:d,kind:'object',id:o.id,point:{x:origin.x+direction.x*d,y:origin.y+direction.y*d,z:origin.z+direction.z*d}};}
  }
- for(const p of players){const base=p.y||0;check({min:{x:p.x-.28,y:base,z:p.z-.28},max:{x:p.x+.28,y:base+1.75,z:p.z+.28}},'player',p.id);}
+ for(const p of players){const base=p.y||0,tall=p.crouch?CROUCH_BODY_HEIGHT:BODY_HEIGHT;check({min:{x:p.x-.28,y:base,z:p.z-.28},max:{x:p.x+.28,y:base+tall,z:p.z+.28}},'player',p.id);}
  return hit;
 }
 export function pathTo(from,to,objects=fixtures){const map=mapFor(objects),level=map.raised?(x,z)=>terrainHeight(map,x,z):()=>0,key=(x,z)=>x+','+z,sx=Math.round(from.x),sz=Math.round(from.z),queue=[[sx,sz]],parent=new Map([[key(sx,sz),null]]);let end;for(let i=0;i<queue.length;i++){const [x,z]=queue[i];if(Math.hypot(x-to.x,z-to.z)<1.6&&Math.abs(level(x,z)-level(to.x,to.z))<.35){end=[x,z];break;}for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,nz=z+dz,k=key(nx,nz);if(!parent.has(k)&&Math.abs(level(nx,nz)-level(x,z))<.35&&free(nx,nz,.3,objects,null,level(nx,nz))){parent.set(k,[x,z]);queue.push([nx,nz]);}}}if(!end)return[];const result=[];while(end&&(end[0]!==sx||end[1]!==sz)){result.unshift({x:end[0],z:end[1]});end=parent.get(key(...end));}return result;}

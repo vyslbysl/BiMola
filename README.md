@@ -83,6 +83,10 @@ Aynı yerde çakılıp kalmak artık bedava değil: oda ayarındaki süre boyunc
 
 **Avcı:** Sol fare tuşuna veya Boşluk'a basılı tutarak su sık. Doğru nişan ve görüş gerekir; duvarlar, mobilyalar ve öndeki nesneler suyu keser. **Sıradan bir eşyaya tek atış yeter:** ilk isabette tamamen ıslanır ve "gerçek eşya" olarak işaretlenir, yani onu elemek için depo boşaltmak gerekmez. Yine de sıkmaya devam etmenin bir anlamı vardır: oda ayarındaki sayıya (varsayılan 50 atış) gelince eşya dağılıp yok olur ve saklananların saklanacak yeri azalır. Saklanan bir oyuncu ise oda ayarına göre ıslanır — varsayılan 3 isabette, yani her atışta %34 — ve ancak %100'e ulaştığında açığa çıkıp elenir. Depo 25 atış alır; R ile 2 saniyede dolar.
 
+**Eğilme (C, basılı tut):** avcının göz hizası 1,62 m'den 0,95 m'ye iner, namlu da onunla birlikte. Bunun işe yaradığı yer uzak değil, yakındır: ayakta duran avcı bir masanın altını 2 m'den zaten görür, ama masaya 1,2 m'den fazla yaklaştığında tabla görüşünü keser — yani tam nişan alıp doğrulayacağı anda kör kalır. Eğilerek 0,8 m'ye kadar yaklaşıp altını görmeye devam eder. Karşılığında hızı 4,3'ten 2,1 m/s'ye düşer ve eğilirken zıplayamaz; eğilmek bakmak içindir, kovalamak için değil. Tuş bırakılınca doğrulur.
+
+Eğilmek çarpışma kutusunu küçültmez: masa altı boşlukları 0,62–0,70 m olduğu için avcı eğilerek de oraya sığmaz, "yalnızca küçük kılıklar masa altına girer" kuralı korunur. Eğilme yalnızca avcıya açıktır ve botlar eğilmez. Duruşu sunucu belirler, yani gördüğün her şeye gerçekten ateş edebilirsin; uzaktaki avcılar da eğildiklerinde alçalır.
+
 Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm, can puanı, silahlı çatışma, kaçış görevleri veya yetenek kartları yoktur.
 
 ## Yakalanınca izleme
@@ -101,10 +105,10 @@ Beş yeni haritanın tasarım planı ve Higgsfield üretim durumları: [Alternat
 | Fare | Bakış ve kamera (tur boyunca fare imleci oyuna kilitlenir) |
 | E | Baktığın eşya ol; hiçbir şeye bakmıyorsan listeyi aç/kapat. Bir eşyanın yanına gelince liste **kendiliğinden açılır**, 1–8 ile seçersin |
 | Q | Odaya ve bulunduğun yere uygun rastgele nesneye değiş (3 hak) — yerdeyken yerde duran eşyalara, bir yüzeydeyken yüzeyde duran eşyalara |
-| C | Sahte kopya bırak (saklanma süresinde de olur, turda 3 hak, isabet alana kadar kalır) |
+| C | **Saklanan:** sahte kopya bırak (saklanma süresinde de olur, turda 3 hak, isabet alana kadar kalır). **Avcı:** basılı tuttukça eğil |
 | Z / X | Nesnenin yönünü çevir |
 | Fare tekerleği / PgUp · PgDn | Kılığı yükselt · indir (sıradan eşya en fazla 2,2 m; duvara asılı parçalar 3,4 m). Koltuğa gömülü bir minder gibi eşyalar kaldırılırken bir sonraki boş yüksekliğe çıkar |
-| Boşluk | Zıpla — saklanan tezgaha ve masaya çıkar, avcı yüksek rafların üstünü görmek için zıplar |
+| Boşluk | Zıpla — saklanan tezgaha ve masaya çıkar, avcı yüksek rafların üstünü görmek için zıplar (eğilirken zıplanmaz) |
 | F | Konumu sabitle / serbest bırak |
 | Sol tık | Su sık |
 | R | Su deposunu doldur |
@@ -148,7 +152,7 @@ Aynı ağdaki oyuncular sunucu bilgisayarının yerel IP adresi ve 3000 portuyla
 npm test
 ```
 
-Nesne seçimi, üç rastgele değişim, su miktarının korunması, duvar arkasına isabetin engellenmesi, yeniden doldurma, hazırlık gizliliği, kapasite/bot ayarları, yetki kontrolleri ve gerçek Socket.IO bağlantıları test edilir. Avcı karakteri tarafında: katalog bütünlüğü, sunucunun tanımadığı görünüm adını reddedip varsayılana düşmesi, seçimin tur sıfırlaması ve takım değişimini atlatması, bot takımının katalogda dolaşması, üç kıyafetin insan ölçeğinde sonlu geometri kurması ve kıyafet katmanının yüz bölgesine hiç dokunmaması sınanır — geometri testi tarayıcı veya WebGL gerektirmez. Bot simülasyonları 3'e 3, 6'ya 6 ve 12'ye 12 çalıştırılmıştır. Bu, 24 farklı cihazla gerçek ağ yük testi yapıldığı anlamına gelmez.
+Nesne seçimi, üç rastgele değişim, su miktarının korunması, duvar arkasına isabetin engellenmesi, yeniden doldurma, hazırlık gizliliği, kapasite/bot ayarları, yetki kontrolleri ve gerçek Socket.IO bağlantıları test edilir. Avcı karakteri tarafında: katalog bütünlüğü, sunucunun tanımadığı görünüm adını reddedip varsayılana düşmesi, seçimin tur sıfırlaması ve takım değişimini atlatması, bot takımının katalogda dolaşması, üç kıyafetin insan ölçeğinde sonlu geometri kurması ve kıyafet katmanının yüz bölgesine hiç dokunmaması sınanır — geometri testi tarayıcı veya WebGL gerektirmez. Eğilme tarafında: göz ve namlunun birlikte inmesi, masaya 0,8 ve 1,2 m'de ayakta duran atışın tablaya, eğilen atışın masa altındaki kupaya gitmesi, tuş bırakılınca ve bayat girdide doğrulma, yalnızca avcıya işlemesi, yavaşlama, eğilirken zıplayamama, çarpışmanın değişmemesi ve tur sıfırlaması sınanır. Bot simülasyonları 3'e 3, 6'ya 6 ve 12'ye 12 çalıştırılmıştır. Bu, 24 farklı cihazla gerçek ağ yük testi yapıldığı anlamına gelmez.
 
 Oda ve tur durumu bellektedir, sunucu yeniden başlayınca silinir. Hesap/kalıcı ilerleme/otomatik yeniden bağlanma yoktur. Botlar basit nesne inceleme davranışı kullanır; insan oyuncuların stratejik seviyesinde değildir. Sahne, fotoğraf varlıkları yerine ayrıntılı geometri ve üretilen malzeme dokularıyla oluşturulmuştur. WebGL 2 ve donanım hızlandırması gerekir. Yazı tipleri Google Fonts üzerinden yüklenir, çevrimdışıyken sistem yazı tipleri kullanılır.
 

@@ -53,7 +53,7 @@ export function createGameServer(){
    if(typeof ack==='function')ack(result);if(result.ok)publish(r);
   });
   s.on('input',(v={})=>{const r=rooms.get(s.data.code),p=r?.players[s.id];if(!p||!v||typeof v!=='object'||!['prep','play'].includes(r.phase))return;
-   p.input={x:Number.isFinite(v.x)?Math.max(-1,Math.min(1,v.x)):0,z:Number.isFinite(v.z)?Math.max(-1,Math.min(1,v.z)):0,fire:!!v.fire,jump:!!v.jump,spin:Number.isFinite(v.spin)?Math.max(-1,Math.min(1,v.spin)):0,lift:Number.isFinite(v.lift)?Math.max(-1,Math.min(1,v.lift)):0};
+   p.input={x:Number.isFinite(v.x)?Math.max(-1,Math.min(1,v.x)):0,z:Number.isFinite(v.z)?Math.max(-1,Math.min(1,v.z)):0,fire:!!v.fire,jump:!!v.jump,crouch:!!v.crouch,spin:Number.isFinite(v.spin)?Math.max(-1,Math.min(1,v.spin)):0,lift:Number.isFinite(v.lift)?Math.max(-1,Math.min(1,v.lift)):0};
    if(Number.isFinite(v.yaw))p.yaw=((v.yaw%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
    if(Number.isFinite(v.pitch))p.pitch=Math.max(-1.35,Math.min(1.35,v.pitch));p.inputAt=Date.now();
   });
