@@ -27,6 +27,14 @@ npm start
 
 Her haritanın mimarisi, nesne havuzu ve bot yolları ayrıdır. Eşya değişimi, kopyalar, isabet ve yoğunluk ayarları ortak çalışır. Yeni haritalarda 21 yeni eşya türü bulunur; büyük nesnelerin üzerindeki küçük eşyalar bağımsız seçilir. Müzedeki yükseltme sınırı bulunulan katın zemininden ölçülür. Gönderilen görsellerden palet, malzeme ve yerleşim fikri alınmıştır; sahneler gerçek zamanlı geometriyle yeniden kurulmuştur, fotoğrafların birebir 3D kopyası değildir.
 
+## Avcı karakteri
+
+Katılma ekranında, taraf seçiminin altında üç hazır karakter vardır: **Levi** (geniş şapka, uzun ceket), **Marco** (beyaz yakalı siyah gömlek) ve **Yusuf** (takke, krem cübbe). Seçim oturum başına bir kezdir, tarayıcıda oyundaki adın yanında saklanır ve bir sonraki girişte hazır gelir. Kart üzerindeki figür ayrı bir vitrin modeli değil, sahnede kullanılan avatarın kendisidir.
+
+Karakter yalnızca **avcı olduğun turlarda** görünür; saklananlar ortak görünümde kalır ve nesneye dönüştüklerinde zaten insan olarak çizilmezler. Takımlar tur arası yer değiştirdiğinde seçim oyuncuda kalır, yeniden seçmen gerekmez. Botlar katalogda sırayla dolaşır, yani dolu bir bot avcı takımı tek karakterin kopyası olmaz.
+
+Üç karakterin baş, yüz ve beden geometrisi birebir aynıdır: ayrım yalnızca kıyafet, başlık ve renklerden gelir, yüz veya beden hatlarından gelmez. Her karakterde takım rengi (teal) bir aksesuar olarak durur — şapka bandı, gömlek düğmeleri, cübbe patı — böylece avcı uzaktan hâlâ avcı gibi okunur. Birinci şahıs görünümünde ekranın altındaki kolluk da seçtiğin karakterin kumaşını alır.
+
 ## Oda ayarları
 
 Ayar ekranı dört bölüme ayrılır ve aynı şeyi anlatan seçenekler tek dile indirilmiştir: **Mekân**, **Oyuncular**, **Tur akışı**, **Denge**.
@@ -140,7 +148,7 @@ Aynı ağdaki oyuncular sunucu bilgisayarının yerel IP adresi ve 3000 portuyla
 npm test
 ```
 
-Nesne seçimi, üç rastgele değişim, su miktarının korunması, duvar arkasına isabetin engellenmesi, yeniden doldurma, hazırlık gizliliği, kapasite/bot ayarları, yetki kontrolleri ve gerçek Socket.IO bağlantıları test edilir. Bot simülasyonları 3'e 3, 6'ya 6 ve 12'ye 12 çalıştırılmıştır. Bu, 24 farklı cihazla gerçek ağ yük testi yapıldığı anlamına gelmez.
+Nesne seçimi, üç rastgele değişim, su miktarının korunması, duvar arkasına isabetin engellenmesi, yeniden doldurma, hazırlık gizliliği, kapasite/bot ayarları, yetki kontrolleri ve gerçek Socket.IO bağlantıları test edilir. Avcı karakteri tarafında: katalog bütünlüğü, sunucunun tanımadığı görünüm adını reddedip varsayılana düşmesi, seçimin tur sıfırlaması ve takım değişimini atlatması, bot takımının katalogda dolaşması, üç kıyafetin insan ölçeğinde sonlu geometri kurması ve kıyafet katmanının yüz bölgesine hiç dokunmaması sınanır — geometri testi tarayıcı veya WebGL gerektirmez. Bot simülasyonları 3'e 3, 6'ya 6 ve 12'ye 12 çalıştırılmıştır. Bu, 24 farklı cihazla gerçek ağ yük testi yapıldığı anlamına gelmez.
 
 Oda ve tur durumu bellektedir, sunucu yeniden başlayınca silinir. Hesap/kalıcı ilerleme/otomatik yeniden bağlanma yoktur. Botlar basit nesne inceleme davranışı kullanır; insan oyuncuların stratejik seviyesinde değildir. Sahne, fotoğraf varlıkları yerine ayrıntılı geometri ve üretilen malzeme dokularıyla oluşturulmuştur. WebGL 2 ve donanım hızlandırması gerekir. Yazı tipleri Google Fonts üzerinden yüklenir, çevrimdışıyken sistem yazı tipleri kullanılır.
 

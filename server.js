@@ -40,7 +40,7 @@ export function createGameServer(){
    const humans=t=>Object.values(r.players).filter(p=>!p.bot&&p.team===t).length;
    if(r.settings.teamSelection==='auto')team=humans('hunter')<humans('hider')?'hunter':'hider';
    if(humans(team)>=r.settings.teamSize)team=team==='hunter'?'hider':'hunter';
-   r.players[s.id]=player(s.id,name,false,team);s.data.code=r.code;s.join(r.code);syncBots(r);
+   r.players[s.id]=player(s.id,name,false,team,data.skin);s.data.code=r.code;s.join(r.code);syncBots(r);
    if(r.practice){r.settings.botMode='fill';syncBots(r);start(r);r.phase='brief';r.until=0;}
    ack({code:r.code,id:s.id});publish(r);
   });
