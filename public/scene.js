@@ -1,4 +1,4 @@
-import {EYE_HEIGHT,GUN_POSITION,MUZZLE_LOCAL} from './weapon.js';
+import {EYE_HEIGHT,CROUCH_EYE_HEIGHT,eyeHeight,GUN_POSITION,MUZZLE_LOCAL} from './weapon.js';
 import {buildMapProp,buildMapArchitecture} from './map-models.js';
 import * as THREE from '/vendor/three.module.js';
 import {moveSpectator} from './spectator.js';
@@ -6,6 +6,11 @@ import {buildSkin,skinFor,DEFAULT_SKIN} from './skins.js';
 import {installHiggsfieldMaterials} from './materials.js';
 import {mapFor,wallBoxes,terrainBoxes,ROOM,walls,props as initialProps,propTypes,dimensions,objectDistance,hitParts} from './world.js';
 
+// Eğilen avcı modeli dikeyde bu oranda sıkışır. Model kökeni ayaklarda olduğu için ayaklar yerde
+// kalır ve göz, baş, silah kolu tam sunucunun nişan aldığı yüksekliğe iner: uzaktan gördüğün
+// avcının namlusu, sunucunun atışı başlattığı yerle aynı yerde durur. Bedel, dizden bükülen bir
+// çömelme yerine dikeyde sıkışan bir figür; bu ayrıntı düzeyinde kabul edilebilir bir takas.
+const CROUCH_SCALE=CROUCH_EYE_HEIGHT/EYE_HEIGHT;
 // Every game object and its disguise share these models. No second, telltale silhouette.
 export function createScene(container){
  const scene=new THREE.Scene();scene.background=new THREE.Color('#d9e3df');scene.fog=new THREE.Fog('#e9e6dc',62,150);
@@ -309,7 +314,7 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   // Takımlar tur arası yer değiştirdiğinde model yeniden kurulur; seçilen avcı karakteri de aynı
   // karşılaştırmaya girer, yoksa saklananken kurulan gövde avcı olunca eski kalırdı.
   const look=team==='hunter'?skinFor(p.skin):null;
-  if(g&&(g.userData.team!==team||g.userData.skin!==look)){scene.remove(g);people.delete(p.id);g=null;}if(!g){g=avatar(team,p.skin);scene.add(g);g.position.set(p.x,p.y||0,p.z);people.set(p.id,g);}g.userData.target=new THREE.Vector3(p.x,p.y||0,p.z);g.userData.angle=p.yaw||0;if(g.userData.weaponPivot)g.userData.weaponPivot.rotation.x=p.pitch||0;g.visible=p.id!==myId;}for(const[id,g]of people)if(!visibleIds.has(id))g.visible=false;for(const shot of state.shots||[])addShot(shot);}
+  if(g&&(g.userData.team!==team||g.userData.skin!==look)){scene.remove(g);people.delete(p.id);g=null;}if(!g){g=avatar(team,p.skin);scene.add(g);g.position.set(p.x,p.y||0,p.z);people.set(p.id,g);}g.userData.target=new THREE.Vector3(p.x,p.y||0,p.z);g.userData.angle=p.yaw||0;g.userData.crouch=!!p.crouch;if(g.userData.weaponPivot)g.userData.weaponPivot.rotation.x=p.pitch||0;g.visible=p.id!==myId;}for(const[id,g]of people)if(!visibleIds.has(id))g.visible=false;for(const shot of state.shots||[])addShot(shot);}
  const tempVec=new THREE.Vector3(),cameraTarget=new THREE.Vector3(),focus=new THREE.Vector3();
  let frameCount=0,frameSum=0,frameTicks=0;
  // Kamera ile kılık arasında kalan duvar, tavan paneli veya mobilya o kare boyunca gizlenir:
@@ -331,7 +336,10 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  if(renderer.shadowMap.enabled&&frameCount%shadowEvery===0)renderer.shadowMap.needsUpdate=true;
  const dt=Math.min(.06,Math.max(.001,(t-lastTime)/1000));lastTime=t;currentState=state;currentId=myId;own=state?.players?.find(p=>p.id===myId)||null;
  const mix=1-Math.exp(-dt*17);for(const g of objectModels.values()){if(g.userData.target){g.position.lerp(g.userData.target,mix);g.rotation.y+=Math.atan2(Math.sin(g.userData.angle-g.rotation.y),Math.cos(g.userData.angle-g.rotation.y))*mix;}}
- for(const [id,g]of people){if(g.userData.target){const speed=g.position.distanceTo(g.userData.target);g.position.lerp(g.userData.target,mix);g.rotation.y=g.userData.angle;g.userData.limbs?.forEach((l,i)=>l.rotation.x=speed>.015?Math.sin(t*.009+(i%2)*Math.PI)*.38:0);g.visible=g.visible&&id!==myId;}}
+ for(const [id,g]of people){if(g.userData.target){const speed=g.position.distanceTo(g.userData.target);g.position.lerp(g.userData.target,mix);g.rotation.y=g.userData.angle;g.userData.limbs?.forEach((l,i)=>l.rotation.x=speed>.015?Math.sin(t*.009+(i%2)*Math.PI)*.38:0);
+  // Eğilme anlık değil, konumla aynı yumuşatmayla iner ve kalkar.
+  g.scale.y+=((g.userData.crouch?CROUCH_SCALE:1)-g.scale.y)*mix;
+  g.visible=g.visible&&id!==myId;}}
  const playing=active&&own&&Number.isFinite(own.x)&&Number.isFinite(own.z);recoil=Math.max(0,recoil-dt*5.4);
  if(playing&&own.status==='found'){
   showAll();gun.visible=false;
@@ -376,7 +384,7 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   camera.lookAt(focus);
   if(refreshOccluders)hideOccluders(camera.position,cameraTarget,myObject);
   const body=people.get(myId);if(body)body.visible=!myObject&&own.status!=='found';gun.visible=false;}
- else{showAll();const desired=pos.clone().add(new THREE.Vector3(0,EYE_HEIGHT,0));if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*27));camera.rotation.set(Math.max(-1.35,Math.min(1.35,pitch)),yaw,0,'YXZ');gun.visible=!!entered&&own.status!=='found';
+ else{showAll();const desired=pos.clone().add(new THREE.Vector3(0,eyeHeight(own),0));if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*27));camera.rotation.set(Math.max(-1.35,Math.min(1.35,pitch)),yaw,0,'YXZ');gun.visible=!!entered&&own.status!=='found';
   // Avcı kendi modelini hiç görmez, yalnızca bu kolu: kolluk seçtiği karakterin kumaşını alır,
   // yoksa oyuncu turda kendi seçiminin izini göremezdi.
   const sleeve=styleFor(own.skin).shirt||m.cream;if(arm.material!==sleeve)arm.material=sleeve;

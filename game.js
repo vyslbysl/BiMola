@@ -1,4 +1,4 @@
-import {weaponPose,toward} from './public/weapon.js';
+import {weaponPose,toward,eyeHeight} from './public/weapon.js';
 import {validMap,MAP_CHOICES} from './public/maps.js';
 import {SKINS,DEFAULT_SKIN,skinFor} from './public/skins.js';
 import {assembly,moveAssembly,detachChildren,settleObjects} from './public/physics.js';
@@ -8,6 +8,9 @@ export {dist};
 // Kaç isabetin bir saklananı ortaya çıkardığı ve ıslanan saklananın kaçış hızı artık oda
 // ayarıdır; buradaki değerler yalnızca varsayılan.
 export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPEED=4.3;
+// Eğilen avcı yavaşlar: eğilmek bakmak içindir, kovalamak için değil. Islanan saklanan zaten
+// HUNTER_SPEED'in katıyla kaçtığı için eğilerek takip etmek bir seçenek olmamalı.
+export const CROUCH_SPEED=2.1;
 export const LEAN_PROP_COUNT=10;
 // Aynı gerçek eşyaya inatla su sıkan avcı sonunda onu dağıtır: oda boşalır, saklanacak yer azalır.
 export const DEFAULT_SMASH=50,MIN_SMASH=5,MAX_SMASH=200;
@@ -51,7 +54,7 @@ export function sanitizeSettings(input={},previous=defaultSettings){
 // `skin` avcı görünümüdür ve oyuncuya aittir, odaya değil: katılırken bir kez seçilir, tur
 // sıfırlamaları ve takım değişimleri onu bozmaz. Geçersiz bir ad varsayılana düşer.
 export function player(id,name,bot=false,team='hider',skin=DEFAULT_SKIN){
- return {id,name,bot,team:teams.includes(team)?team:'hider',role:teams.includes(team)?team:'hider',skin:skinFor(skin),x:0,y:0,z:11,vy:0,grounded:true,yaw:0,pitch:0,status:'alive',input:{},inputAt:0,propId:null,water:0,changes:3,decoys:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0};
+ return {id,name,bot,team:teams.includes(team)?team:'hider',role:teams.includes(team)?team:'hider',skin:skinFor(skin),x:0,y:0,z:11,vy:0,grounded:true,crouch:false,yaw:0,pitch:0,status:'alive',input:{},inputAt:0,propId:null,water:0,changes:3,decoys:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0};
 }
 const count=(r,team,humansOnly=false)=>Object.values(r.players).filter(p=>p.team===team&&(!humansOnly||!p.bot)).length;
 export function syncBots(r){
@@ -120,7 +123,7 @@ export function start(r,now=Date.now()){
    }
   }
   if(!free(x,z,.28,r.objects,null,groundAt(x,z,r.objects))||spawned.some(q=>dist({x,z},q)<.65)){const base={x,z};search:for(let radius=.75;radius<6;radius+=.75)for(let j=0;j<16;j++){const px=base.x+Math.cos(j*Math.PI/8)*radius,pz=base.z+Math.sin(j*Math.PI/8)*radius;if(free(px,pz,.28,r.objects,null,groundAt(px,pz,r.objects))&&!spawned.some(q=>dist({x:px,z:pz},q)<.65)){x=px;z=pz;break search;}}}spawned.push({x,z});
-  Object.assign(p,{role:p.team,x,z,y:groundAt(x,z,r.objects),vy:0,grounded:true,yaw:p.team==='hunter'?Math.PI:0,pitch:0,status:'alive',input:{},inputAt:now,propId:null,water:0,changes:3,decoys:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0,goal:null,botTarget:null,botTargetUntil:0,botScanned:new Set(),botBurstUntil:0,lastProgressAt:now,lastProgress:{x,z}});
+  Object.assign(p,{role:p.team,x,z,y:groundAt(x,z,r.objects),vy:0,grounded:true,crouch:false,yaw:p.team==='hunter'?Math.PI:0,pitch:0,status:'alive',input:{},inputAt:now,propId:null,water:0,changes:3,decoys:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0,goal:null,botTarget:null,botTargetUntil:0,botScanned:new Set(),botBurstUntil:0,lastProgressAt:now,lastProgress:{x,z}});
  }
  return {ok:true};
 }
@@ -245,9 +248,10 @@ function botInput(r,p,now){
   const pool=nearby.length?nearby:candidates;target=pool[Math.floor(Math.random()*pool.length)];p.botTarget=target.id;p.botTargetUntil=now+14000;p.pathAt=0;
  }
  const dx=target.x-p.x,dz=target.z-p.z,d=Math.hypot(dx,dz),y=(target.y||0)+propTypes[target.type].height*.5;
- p.yaw=Math.atan2(-dx,-dz);p.pitch=Math.atan2(y-(1.62+(p.y||0)),d);
+ // Botlar eğilmez, ama göz hizası tek kaynaktan gelsin: eyeHeight onlar için hep EYE_HEIGHT döner.
+ p.yaw=Math.atan2(-dx,-dz);p.pitch=Math.atan2(y-(eyeHeight(p)+(p.y||0)),d);
  const direction={x:-Math.sin(p.yaw)*Math.cos(p.pitch),y:Math.sin(p.pitch),z:-Math.cos(p.yaw)*Math.cos(p.pitch)};
- const check=nearestHit({x:p.x,y:1.62+(p.y||0),z:p.z},direction,r.objects);
+ const check=nearestHit({x:p.x,y:eyeHeight(p)+(p.y||0),z:p.z},direction,r.objects);
  if(d<10&&check.kind==='object'&&check.id===target.id){p.input={fire:true};if(p.ammo<4)reload(r,p,now);return;}
  if(now>p.pathAt||!p.path.length){p.path=pathTo(p,target,r.objects);p.pathAt=now+2000;}
  while(p.path.length&&dist(p,p.path[0])<.5)p.path.shift();const waypoint=p.path[0]||target;
@@ -272,6 +276,9 @@ export function tick(r,now,dt){
   if(p.reloadUntil&&now>=p.reloadUntil){p.ammo=100;p.reloadUntil=0;}
   if(p.team==='hunter'&&r.phase==='prep')continue;
   if(p.bot)botInput(r,p,now);else if(now-p.inputAt>500)p.input={};
+  // Eğilme yalnızca avcının ve basılı tutulduğu sürece: tuş bırakılınca doğrulur. Bayat girdi
+  // yukarıda temizlendiği için sekme arkaya alınan ya da bağlantısı kopan avcı da doğrulur.
+  p.crouch=p.team==='hunter'&&!!p.input.crouch;
   const o=p.propId?r.objects.find(o=>o.id===p.propId):null,radius=o?propTypes[o.type].radius:.28;
   // The disguise decides what fits where: a mug can duck under the dining table, a wardrobe-sized
   // player cannot, and anything broad enough doubles as a step to jump on.
@@ -284,7 +291,7 @@ export function tick(r,now,dt){
    if(!free(nx,nz,radius,r.objects,null,ny,tall))return false;p.x=nx;p.z=nz;p.y=ny;return true;
   };
   if(len&&!p.locked){
-   x/=len;z/=len;const speed=p.team==='hunter'?HUNTER_SPEED:p.water>0?HUNTER_SPEED*(r.settings?.escapeBoost||DEFAULT_ESCAPE):o?2.8:4;
+   x/=len;z/=len;const speed=p.team==='hunter'?(p.crouch?CROUCH_SPEED:HUNTER_SPEED):p.water>0?HUNTER_SPEED*(r.settings?.escapeBoost||DEFAULT_ESCAPE):o?2.8:4;
    for(const [axis,amount]of [['x',x*speed*dt],['z',z*speed*dt]]){const steps=Math.max(1,Math.ceil(Math.abs(amount)/.1));for(let i=0;i<steps;i++){if(!attempt(p.x+(axis==='x'?amount/steps:0),p.z+(axis==='z'?amount/steps:0)))break;if(o){o.anchored=false;const host=r.objects.find(q=>q.id===o.supportId);if(host&&!contains(host,o.x,o.z,-.035))delete o.supportId;}}}
   }
   const spin=Math.max(-1,Math.min(1,Number(p.input.spin)||0));
@@ -318,7 +325,8 @@ export function tick(r,now,dt){
     // Asılı bir kılık duvarda kalır: yana kaydırılsa da düşmez.
     p.vy=0;p.grounded=true;
    }else{
-    if(p.input.jump&&p.grounded&&!p.locked){p.vy=JUMP_SPEED;if(o)delete o.supportId;}
+    // Eğilirken zıplanmaz: C bırakılıp doğrulunca Boşluk yine çalışır.
+    if(p.input.jump&&p.grounded&&!p.locked&&!p.crouch){p.vy=JUMP_SPEED;if(o)delete o.supportId;}
     // Koltuğun içine gömülü bir minder gibi, yerleşimi yüzeyin altında olan kılıklar yerinde
     // kalır: yerçekimi onları yukarı fırlatmaz, yalnızca yukarıdaysa aşağı çeker.
     const resting=Math.min(ground,p.y);
@@ -356,7 +364,7 @@ export function view(r,id,now=Date.now()){
    const visible=own||inMatch&&!blind&&(teammate||!transformed&&p.status==='alive'&&(me.status==='found'||dist(eye,p)<35&&sight(eye,p,r.objects)));
    // Görünüm ada benzer, gizli bir bilgi değil: her pakette gider, böylece takımlar yer
    // değiştirdiğinde de doğru karakter çizilir.
-   return {id:p.id,name:p.name,bot:p.bot,team:p.team,role:p.team,skin:p.skin,status:p.status,visible:!!visible,...(visible?{x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch}:{}),...((own||teammate)&&inMatch?{propId:p.propId}:{}),...(own?{water:p.water,changes:p.changes,decoys:p.decoys,locked:p.locked,ammo:p.ammo,reloadUntil:p.reloadUntil,exposed:p.exposedUntil>now,stillFor:p.stillAt?Math.round((now-p.stillAt)/1000):0}:{} )};
+   return {id:p.id,name:p.name,bot:p.bot,team:p.team,role:p.team,skin:p.skin,status:p.status,visible:!!visible,...(visible?{x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch,crouch:!!p.crouch}:{}),...((own||teammate)&&inMatch?{propId:p.propId}:{}),...(own?{water:p.water,changes:p.changes,decoys:p.decoys,locked:p.locked,ammo:p.ammo,reloadUntil:p.reloadUntil,exposed:p.exposedUntil>now,stillFor:p.stillAt?Math.round((now-p.stillAt)/1000):0}:{} )};
   }),
   objects:inMatch?objects.map(({id,type,x,y,z,angle,wet})=>({id,type,x,y:y||0,z,angle,wet})):[],
   effects:blind?[]:(r.effects||[]).filter(e=>now-e.at<1800&&(me.status==='found'||dist(eye,e)<35)&&(e.kind!=='idle'||me.team==='hunter'||e.owner===id)),
