@@ -275,7 +275,7 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   if(age>1500)return;
   const g=new THREE.Group();g.position.set(effect.x,effect.y||0,effect.z);scene.add(g);
   const idle=effect.kind==='idle';
-  const material=new THREE.MeshStandardMaterial({color:effect.kind==='decoy'?'#a8ddd8':idle?'#efb851':'#60cce6',transparent:true,opacity:idle?.62:.9,roughness:.23,metalness:.15,side:idle?THREE.DoubleSide:THREE.FrontSide});
+  const material=new THREE.MeshStandardMaterial({color:effect.kind==='decoy'?'#a8ddd8':effect.kind==='smash'?'#c58a5c':idle?'#efb851':'#60cce6',transparent:true,opacity:idle?.62:.9,roughness:.23,metalness:.15,side:idle?THREE.DoubleSide:THREE.FrontSide});
   const ring=new THREE.Mesh(ringGeometry,material);ring.rotation.x=-Math.PI/2;ring.position.y=.08;g.add(ring);
   const pieces=[];
   // İz bir patlama değil, bir işaret: kıymık saçmaz, yerinde nefes alan bir sütun bırakır.

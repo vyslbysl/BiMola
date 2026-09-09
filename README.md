@@ -29,17 +29,41 @@ Her haritanın mimarisi, nesne havuzu ve bot yolları ayrıdır. Eşya değişim
 
 ## Oda ayarları
 
-- Takım başına 1–12 kişi: 1'e 1, 3'e 3, 5'e 5, 6'ya 6, 12'ye 12.
-- Bot yok / boş yerleri doldur / iki takım için ayrı bot sayısı.
+Ayar ekranı dört bölüme ayrılır ve aynı şeyi anlatan seçenekler tek dile indirilmiştir: **Mekân**, **Oyuncular**, **Tur akışı**, **Denge**.
+
+**Mekân**
+
+- Harita önizlemeli kartlardan seçilir; **Turlar arasında** rotasyon varsayılan olarak açıktır (bkz. Haritalar).
+- **Eşya yoğunluğu (çok az · az · normal · yoğun · tıklım tıklım, varsayılan çok az):** tek ayar hem süs eşyası oranını hem her tur serpilen ek eşya sayısını belirler — çok az = %25 süs + 10 ek eşya (oda ~120 nesne), tıklım tıklım = tam süs + 90 ek eşya (~340 nesne). Mobilya, tezgah ve üstünde başka bir şey taşıyan parçalar her kademede yerinde kalır; yalnızca üstünde bir şey olmayan küçük süsler seyreltilir, yani odalar kimliğini kaybetmez. En seyrek kademe zayıf ekran kartlarında en akıcısıdır.
+
+**Oyuncular**
+
+- Takım başına 1–12 kişi: 1'e 1, 3'e 3, 5'e 5, 6'ya 6, 12'ye 12. Tur, her iki tarafta en az bir kişi varsa başlar; takımların eşit olması gerekmez, seçilen sayı yalnızca üst sınırdır.
+- Oyuncular takımlarını seçer veya otomatik dağıtılır. Yeni turda takımlar yer değiştirir.
+- Bot yok / boş yerleri doldur / iki takım için ayrı bot sayısı. Oda sahibi lobide bot ekler/çıkarır ve insanları taşır.
+
+**Tur akışı**
+
 - 10–60 saniye saklanma; 1–10 dakika tur.
-- **Kıpırdamayanın izi (15 · 30 · 45 · 60 saniye · kapalı):** bir saklanan bu kadar süre yer değiştirmezse yerinin ~1 m çevresinde 1,5 saniyelik amber bir iz (halka + ince ışık sütunu) belirir. Yalnızca avcılar ve o saklananın kendisi görür; diğer saklananlara sızmaz. Yarım metreden fazla yer değiştirmek sayacı sıfırlar — yerinde titremek kurtarmaz. Aynı oyuncu için izler arasında en az 3,6 saniye vardır, yani iz yağmuru olmaz ve iz eleme değil ipucudur. Saklanan önce "5 saniye içinde kıpırdamazsan" uyarısını, sonra iz çıktığında ikinci uyarıyı alır.
-- **Süs eşyası yoğunluğu (tam · orta · az · çok az, varsayılan çok az):** tezgah, masa ve duvarlardaki küçük süslerin ne kadarı doğsun. Mobilya, tezgah ve üstünde başka bir şey taşıyan parçalar her kademede yerinde kalır; yalnızca üstünde bir şey olmayan küçük süsler seyreltilir, yani odalar kimliğini kaybetmez. Varsayılan (çok az süs + 10 ek eşya) kurulumda oda ~120 nesneyle açılır; tam süs ve bol eşyayla ~340'a çıkar — zayıf ekran kartlarında en büyük ikinci kazanç budur.
-- **Ek rastgele eşya (0–90, varsayılan 10):** her tur serpilen ekstra eşya sayısı. **Hiç** seçilirse oda yalnızca mobilyasıyla ve her odanın imza parçasıyla (mutfakta kütük masa, salonda duvar tablosu) kalır.
-- **Islatma dayanıklılığı (1–10 isabet, varsayılan 3):** saklanan bir oyuncunun açığa çıkması için gereken isabet sayısı. Her isabet %100'ün bu paya bölünmüş kadarını doldurur (3 isabette %34), son gereken isabet tam %100'e oturur. Gerçek eşyalara her ayarda tek atış yeter.
-- **Islanınca kaçış hızı (1×–2×, varsayılan 1.1×):** ilk isabeti yiyen saklananın avcıya göre kaçış hızı. 1× seçilirse iki taraf aynı hızda koşar.
-- Oyuncular takım seçebilir veya otomatik dağıtılır.
-- Oda sahibi lobide bot ekler/çıkarır, insanları taşır, kapasite ve süreleri değiştirir.
-- Tur, her iki tarafta en az bir kişi varsa başlar: takımların eşit olması gerekmez, 1'e 1 de olur. Takım başına seçilen sayı yalnızca üst sınırdır. Yeni turda takımlar yer değiştirir.
+
+**Denge**
+
+Dört ayarı tek tek kurcalamak yerine bir hazır ayar seçilir: **Dengeli** (varsayılan), **Avcı lehine**, **Saklanan lehine** ya da **Kendim ayarlayayım** — son seçenek dördünü de tek tek açar.
+
+| | Dengeli | Avcı lehine | Saklanan lehine |
+|---|---|---|---|
+| Islatma dayanıklılığı | 3 isabet | 2 isabet | 5 isabet |
+| Islanınca kaçış hızı | 1.1× | 1× | 1.5× |
+| Kıpırdamayanın izi | 30 sn | 15 sn | 60 sn |
+| Gerçek eşya dayanıklılığı | 50 atış | 25 atış | 100 atış |
+
+- **Islatma dayanıklılığı (1–10 isabet):** saklanan bir oyuncunun açığa çıkması için gereken isabet sayısı. Her isabet %100'ün bu paya bölünmüş kadarını doldurur (3 isabette %34) ve son gereken isabet tam %100'e oturur. Gerçek eşyalara ilk atışta "gerçek eşya" damgası vurulur.
+- **Islanınca kaçış hızı (1×–2×):** ilk isabeti yiyen saklananın avcıya göre kaçış hızı. 1× seçilirse iki taraf aynı hızda koşar.
+- **Kıpırdamayanın izi (15 · 30 · 45 · 60 saniye · kapalı):** bir saklanan bu kadar süre yer değiştirmezse yerinin ~1 m çevresinde 1,5 saniyelik amber bir iz (halka + ince ışık sütunu) belirir. Yalnızca avcılar ve o saklananın kendisi görür; yarım metreden fazla yer değiştirmek sayacı sıfırlar, yerinde titremek kurtarmaz.
+- **Gerçek eşya dayanıklılığı (10 · 25 · 50 · 100 · 200 atış · kapalı, varsayılan 50):** sahibi olmayan bir eşyaya inatla su sıkan avcı sonunda onu dağıtıp yok eder; oda boşalır, saklanacak yer azalır. Sayaç eşya başınadır ve ekranda `Gerçek eşya · 12/50` olarak görünür. Bir oyuncunun kılığı olan eşya bu sayacı hiç işletmez — onun kuralı ıslatma dayanıklılığıdır; sahte kopyalar da eskisi gibi tek isabette dağılır. Dağılan eşyanın üstünde duran küçük parçalar desteğini kaybedip yerçekimine bırakılır. Depo 25 atış aldığı için 50 atış iki dolu depo ve arada yeniden doldurma demektir.
+
+**Oda**
+
 - Oda kodu 4 haneli bir sayıdır; davet bağlantısı kodu hazır getirir.
 - Oda sahibi ayrılırsa yetki kalan bir insana geçer. Son insan ayrılınca oda silinir.
 
@@ -49,7 +73,7 @@ Her haritanın mimarisi, nesne havuzu ve bot yolları ayrıdır. Eşya değişim
 
 Aynı yerde çakılıp kalmak artık bedava değil: oda ayarındaki süre boyunca (varsayılan 30 sn) kıpırdamayan saklananın yerinin çevresinde kısa bir iz belirir ve avcılar bunu görür. Kıpırdamak sayacı sıfırlar.
 
-**Avcı:** Sol fare tuşuna veya Boşluk'a basılı tutarak su sık. Doğru nişan ve görüş gerekir; duvarlar, mobilyalar ve öndeki nesneler suyu keser. **Sıradan bir eşyaya tek atış yeter:** ilk isabette tamamen ıslanır ve "gerçek eşya" olarak işaretlenir, üstüne depo boşaltmaya gerek yoktur. Saklanan bir oyuncu ise oda ayarına göre ıslanır — varsayılan 3 isabette, yani her atışta %34 — ve ancak %100'e ulaştığında açığa çıkıp elenir. Depo 25 atış alır; R ile 2 saniyede dolar.
+**Avcı:** Sol fare tuşuna veya Boşluk'a basılı tutarak su sık. Doğru nişan ve görüş gerekir; duvarlar, mobilyalar ve öndeki nesneler suyu keser. **Sıradan bir eşyaya tek atış yeter:** ilk isabette tamamen ıslanır ve "gerçek eşya" olarak işaretlenir, yani onu elemek için depo boşaltmak gerekmez. Yine de sıkmaya devam etmenin bir anlamı vardır: oda ayarındaki sayıya (varsayılan 50 atış) gelince eşya dağılıp yok olur ve saklananların saklanacak yeri azalır. Saklanan bir oyuncu ise oda ayarına göre ıslanır — varsayılan 3 isabette, yani her atışta %34 — ve ancak %100'e ulaştığında açığa çıkıp elenir. Depo 25 atış alır; R ile 2 saniyede dolar.
 
 Süre dolarsa saklananlar, tüm saklananlar bulunursa avcılar kazanır. Ölüm, can puanı, silahlı çatışma, kaçış görevleri veya yetenek kartları yoktur.
 

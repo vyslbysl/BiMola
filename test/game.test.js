@@ -55,7 +55,7 @@ test('moving moves the possessed world prop and locking freezes it; stale input 
  p.propId=null;p.x=13.2;p.z=0;p.input={x:1};p.inputAt=22000;tick(r,22000,.1);assert.ok(p.x<=13.85-.28+.001,'walls prevent escape');
 });
 test('one spray settles a real object; a hidden player soaks the configured share up to 100',()=>{
- const dummy=scenario();dummy.p.x=5;assert.ok(shoot(dummy.r,dummy.h,20000));assert.deepEqual(dummy.r.results.at(-1).data,{wet:100,found:false,objectName:'Çamaşır sepeti',real:true});
+ const dummy=scenario();dummy.p.x=5;assert.ok(shoot(dummy.r,dummy.h,20000));assert.deepEqual(dummy.r.results.at(-1).data,{wet:100,found:false,objectName:'Çamaşır sepeti',real:true,shots:1,smashAt:50});
  const {r,h,p,o}=scenario();assert.equal(r.settings.revealHits,DEFAULT_HITS);possess(r,p,o.id);
  for(let i=0;i<DEFAULT_HITS-1;i++){assert.ok(shoot(r,h,20000+i*SHOT_MS));assert.equal(p.status,'alive');assert.equal(r.results.at(-1).data.found,false);assert.equal(r.results.at(-1).data.real,false);assert.equal(p.water,Math.ceil(100/DEFAULT_HITS)*(i+1));}
  assert.ok(shoot(r,h,20000+(DEFAULT_HITS-1)*SHOT_MS));assert.equal(o.wet,100);assert.equal(p.status,'found');assert.equal(r.results.at(-1).data.found,true);tick(r,22000,.025);assert.equal(r.winner,'hunter');
@@ -342,4 +342,40 @@ test('camping gives you away: an idle disguise leaks a trace, moving resets the 
  assert.equal(sanitizeSettings({idleReveal:900}).idleReveal,120);
  assert.equal(sanitizeSettings({idleReveal:'x'}).idleReveal,0);
  assert.equal(sanitizeSettings({}).idleReveal,DEFAULT_IDLE);
+});
+test('spraying a real object long enough smashes it; disguises and the setting decide',()=>{
+ // Varsayılan 50 isabet: 49'da hâlâ yerinde, 50'de dağılıp yok oluyor.
+ const {r,h,p,o}=scenario();p.x=6;assert.equal(r.settings.smashHits,50);// saklanan atış hattından çıkar
+ // Sepetin üstündeki kupa, atış hattının arkasında kalacak şekilde durur ki isabetleri çalmasın.
+ const shelfItem={id:'ustundeki',type:'mug',x:o.x,y:.56,z:o.z-.6,angle:0,wet:0,supportId:o.id};
+ r.objects.push(shelfItem);
+ const spray=(room,hunter,at)=>{hunter.ammo=100;hunter.reloadUntil=0;return shoot(room,hunter,at);};
+ for(let i=0;i<49;i++)assert.ok(spray(r,h,20000+i*SHOT_MS*2),`isabet ${i+1}`);
+ assert.ok(r.objects.includes(o),'49 isabet yetmez');assert.equal(o.shots,49);
+ assert.ok(spray(r,h,20000+200*SHOT_MS));
+ assert.ok(!r.objects.includes(o),'50. isabette dağılır');
+ assert.equal(r.results.at(-1).data.smashed,true);
+ assert.equal(shelfItem.supportId,undefined,'üstündeki eşya desteğini kaybeder, havada kalmaz');
+ assert.ok(r.effects.some(e=>e.kind==='smash'),'dağılma efekti gider');
+ // Ayar: 5 isabet yeter, kapalıyken hiç dağılmaz.
+ const quick=scenario();quick.p.x=6;quick.r.settings.smashHits=5;
+ for(let i=0;i<4;i++)spray(quick.r,quick.h,20000+i*SHOT_MS*2);
+ assert.ok(quick.r.objects.includes(quick.o));
+ spray(quick.r,quick.h,20000+40*SHOT_MS);assert.ok(!quick.r.objects.includes(quick.o));
+ const off=scenario();off.p.x=6;off.r.settings.smashHits=0;
+ for(let i=0;i<12;i++)spray(off.r,off.h,20000+i*SHOT_MS*2);
+ assert.ok(off.r.objects.includes(off.o),'kapalı ayarda eşya dağılmaz');
+ assert.equal(off.r.results.at(-1).data.smashAt,0);
+ // Bir oyuncunun kılığı olan eşya bu sayacı hiç işletmez: onun kuralı ıslatma dayanıklılığı.
+ const worn=scenario();possess(worn.r,worn.p,worn.o.id);worn.r.settings.smashHits=5;worn.r.settings.revealHits=10;
+ for(let i=0;i<9;i++)spray(worn.r,worn.h,20000+i*SHOT_MS*2);
+ assert.ok(worn.r.objects.includes(worn.o),'kılık dağılmaz');
+ assert.equal(worn.o.shots,undefined,'kılık isabet saymaz, ıslanma yüzdesiyle çözülür');
+ assert.equal(worn.p.status,'alive');assert.equal(worn.p.water,90);
+ spray(worn.r,worn.h,30000);assert.equal(worn.p.status,'found','oyuncu kendi kuralıyla bulunur');
+ // Sınırlar kırpılır.
+ assert.equal(sanitizeSettings({smashHits:1}).smashHits,5);
+ assert.equal(sanitizeSettings({smashHits:9999}).smashHits,200);
+ assert.equal(sanitizeSettings({smashHits:0}).smashHits,0);
+ assert.equal(sanitizeSettings({}).smashHits,50);
 });

@@ -8,6 +8,8 @@ export {dist};
 // ayarıdır; buradaki değerler yalnızca varsayılan.
 export const PREP_MS=20000,ROUND_MS=180000,SHOT_MS=125,RELOAD_MS=2000,HUNTER_SPEED=4.3;
 export const LEAN_PROP_COUNT=10;
+// Aynı gerçek eşyaya inatla su sıkan avcı sonunda onu dağıtır: oda boşalır, saklanacak yer azalır.
+export const DEFAULT_SMASH=50,MIN_SMASH=5,MAX_SMASH=200;
 export const DEFAULT_IDLE=30,MIN_IDLE=10,MAX_IDLE=120;
 export const DEFAULT_HITS=3,MIN_HITS=1,MAX_HITS=10,DEFAULT_ESCAPE=1.1,MIN_ESCAPE=1,MAX_ESCAPE=2;
 // Hiders can hop onto counters, tables and beds: JUMP_SPEED clears the 1 m kitchen counter with
@@ -19,7 +21,7 @@ export const DEFAULT_HITS=3,MIN_HITS=1,MAX_HITS=10,DEFAULT_ESCAPE=1.1,MIN_ESCAPE
 // için orada bırakılan nesne görülebilir kalır. Duvara asılı parçalar (tablo, perde, duvar rafı)
 // LIFT_MAX_MOUNTED'e kadar çıkar; onlar duvarda durması beklenen, göz alıcı parçalar.
 export const GRAVITY=18,JUMP_SPEED=6.6,SPIN_SPEED=2.4,LIFT_SPEED=1.4,LIFT_MAX=2.2,LIFT_MAX_MOUNTED=3.4;
-export const defaultSettings={mapId:'loft',mapRotate:true,teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:LEAN_PROP_COUNT,decor:MIN_DECOR,idleReveal:DEFAULT_IDLE,revealHits:DEFAULT_HITS,escapeBoost:DEFAULT_ESCAPE};
+export const defaultSettings={mapId:'loft',mapRotate:true,teamSize:3,botMode:'fill',hunterBots:0,hiderBots:0,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:LEAN_PROP_COUNT,decor:MIN_DECOR,idleReveal:DEFAULT_IDLE,smashHits:DEFAULT_SMASH,revealHits:DEFAULT_HITS,escapeBoost:DEFAULT_ESCAPE};
 const teams=['hunter','hider'];
 const integer=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)))):fallback;
 const decimal=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Math.round(Number(v)*20)/20)):fallback;
@@ -38,6 +40,8 @@ export function sanitizeSettings(input={},previous=defaultSettings){
  if('decor'in input)settings.decor=decimal(input.decor,MIN_DECOR,MAX_DECOR,settings.decor);
  // Sıfır kapalı demek; onun dışında saniye değeri sınırlanır.
  if('idleReveal'in input)settings.idleReveal=Number(input.idleReveal)?integer(input.idleReveal,MIN_IDLE,MAX_IDLE,settings.idleReveal):0;
+ // Sıfır kapalı demek: eşyalar hiç dağılmaz.
+ if('smashHits'in input)settings.smashHits=Number(input.smashHits)?integer(input.smashHits,MIN_SMASH,MAX_SMASH,settings.smashHits):0;
  if('revealHits'in input)settings.revealHits=integer(input.revealHits,MIN_HITS,MAX_HITS,settings.revealHits);
  if('escapeBoost'in input)settings.escapeBoost=decimal(input.escapeBoost,MIN_ESCAPE,MAX_ESCAPE,settings.escapeBoost);
  if(typeof input.swapTeams==='boolean')settings.swapTeams=input.swapTeams;
@@ -188,7 +192,7 @@ export function shoot(r,p,now=Date.now()){
  const obstructed=clearance.distance<span,from=obstructed?clearance.point:pose.muzzle;
  const hit=obstructed?clearance:nearestHit(from,toward(from,aim.point),r.objects,bodies);
  r.shots.push({id:randomUUID(),from,to:hit.point,at:now,shooter:p.id});r.shots=r.shots.slice(-100);
- let target,o,wet,objectName;
+ let target,o,wet,objectName,shots,smashAt,smashed=false;
  if(hit.kind==='object'){
   o=r.objects.find(o=>o.id===hit.id);target=o.owner?r.players[o.owner]:null;
   // A plain piece of decor is settled with a single spray — no point emptying the tank into it.
@@ -197,6 +201,8 @@ export function shoot(r,p,now=Date.now()){
   const soak=Math.ceil(100/(r.settings?.revealHits||DEFAULT_HITS));
   o.wet=target?Math.min(100,o.wet+soak):100;wet=o.wet;objectName=propTypes[o.type].name;
   if(target)target.water=wet;
+  // Sahibi olmayan gerçek bir eşya isabet sayar: oda ayarındaki sınıra gelince dağılıp yok olur.
+  if(!target&&!o.decoyOf){o.shots=(o.shots||0)+1;shots=o.shots;smashAt=r.settings?.smashHits|0;smashed=!!smashAt&&o.shots>=smashAt;}
  }else if(hit.kind==='player'){
   target=r.players[hit.id];if(target?.team!=='hider')target=null;
   if(target){target.water=Math.min(100,target.water+Math.ceil(100/(r.settings?.revealHits||DEFAULT_HITS)));wet=target.water;objectName='Oyuncu';}
@@ -207,9 +213,12 @@ export function shoot(r,p,now=Date.now()){
   // emptying the tank into it to find out. A hit hider is unlocked immediately so they can run for it.
   const real=hit.kind==='object'&&!target&&!o?.decoyOf;
   if(o?.decoyOf){burst(r,o,now,'decoy');r.objects=r.objects.filter(q=>q.id!==o.id&&(!o.decoyRoot||q.decoyRoot!==o.decoyRoot));}
+  // Dağılan eşyanın üstündeki küçük parçalar desteklerini kaybeder ve yerçekimine bırakılır;
+  // kılığı o eşya olan biri yoktur, çünkü sahipli eşyalar bu sayacı hiç işletmez.
+  else if(smashed&&o){burst(r,o,now,'smash');detachChildren(r.objects,o);r.objects=r.objects.filter(q=>q.id!==o.id);}
   if(found){burst(r,target,now);target.status='found';target.input={};target.locked=true;if(o)delete o.owner;notice(r,`${target.name} bulundu!`,now);}
   else if(target)target.locked=false;
-  r.results.push({playerId:p.id,event:'hit',data:{wet,found,objectName,real,...(o?.decoyOf?{decoy:true}:{})}});
+  r.results.push({playerId:p.id,event:'hit',data:{wet,found,objectName,real,...(shots?{shots,smashAt}:{}),...(smashed?{smashed:true}:{}),...(o?.decoyOf?{decoy:true}:{})}});
  }
  return true;
 }
