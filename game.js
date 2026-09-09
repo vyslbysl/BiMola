@@ -1,5 +1,6 @@
 import {weaponPose,toward} from './public/weapon.js';
 import {validMap,MAP_CHOICES} from './public/maps.js';
+import {SKINS,DEFAULT_SKIN,skinFor} from './public/skins.js';
 import {assembly,moveAssembly,detachChildren,settleObjects} from './public/physics.js';
 import {randomUUID} from 'node:crypto';
 import {mapFor,groundAt,free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,DEFAULT_DECOR,MIN_DECOR,MAX_DECOR,contains,homeKind,fitsHome} from './public/world.js';
@@ -47,8 +48,10 @@ export function sanitizeSettings(input={},previous=defaultSettings){
  if(typeof input.swapTeams==='boolean')settings.swapTeams=input.swapTeams;
  return settings;
 }
-export function player(id,name,bot=false,team='hider'){
- return {id,name,bot,team:teams.includes(team)?team:'hider',role:teams.includes(team)?team:'hider',x:0,y:0,z:11,vy:0,grounded:true,yaw:0,pitch:0,status:'alive',input:{},inputAt:0,propId:null,water:0,changes:3,decoys:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0};
+// `skin` avcı görünümüdür ve oyuncuya aittir, odaya değil: katılırken bir kez seçilir, tur
+// sıfırlamaları ve takım değişimleri onu bozmaz. Geçersiz bir ad varsayılana düşer.
+export function player(id,name,bot=false,team='hider',skin=DEFAULT_SKIN){
+ return {id,name,bot,team:teams.includes(team)?team:'hider',role:teams.includes(team)?team:'hider',skin:skinFor(skin),x:0,y:0,z:11,vy:0,grounded:true,yaw:0,pitch:0,status:'alive',input:{},inputAt:0,propId:null,water:0,changes:3,decoys:3,locked:false,ammo:100,reloadUntil:0,lastShot:-Infinity,path:[],pathAt:0};
 }
 const count=(r,team,humansOnly=false)=>Object.values(r.players).filter(p=>p.team===team&&(!humansOnly||!p.bot)).length;
 export function syncBots(r){
@@ -59,7 +62,8 @@ export function syncBots(r){
   while(existing.length>desired){const bot=existing.pop();delete r.players[bot.id];}
   for(let i=existing.length;i<desired;i++){
    const id='bot-'+randomUUID().slice(0,8);
-   r.players[id]=player(id,`${team==='hunter'?'Avcı':'Saklanan'} Bot ${i+1}`,true,team);
+   // Botlar katalogda sırayla dolaşır: dolu bir avcı takımı aynı karakterin kopyası olmaz.
+   r.players[id]=player(id,`${team==='hunter'?'Avcı':'Saklanan'} Bot ${i+1}`,true,team,SKINS[i%SKINS.length].id);
   }
  }
 }
@@ -350,7 +354,9 @@ export function view(r,id,now=Date.now()){
   players:Object.values(r.players).map(p=>{
    const own=p.id===id,teammate=p.team===me.team,transformed=!!p.propId;
    const visible=own||inMatch&&!blind&&(teammate||!transformed&&p.status==='alive'&&(me.status==='found'||dist(eye,p)<35&&sight(eye,p,r.objects)));
-   return {id:p.id,name:p.name,bot:p.bot,team:p.team,role:p.team,status:p.status,visible:!!visible,...(visible?{x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch}:{}),...((own||teammate)&&inMatch?{propId:p.propId}:{}),...(own?{water:p.water,changes:p.changes,decoys:p.decoys,locked:p.locked,ammo:p.ammo,reloadUntil:p.reloadUntil,exposed:p.exposedUntil>now,stillFor:p.stillAt?Math.round((now-p.stillAt)/1000):0}:{} )};
+   // Görünüm ada benzer, gizli bir bilgi değil: her pakette gider, böylece takımlar yer
+   // değiştirdiğinde de doğru karakter çizilir.
+   return {id:p.id,name:p.name,bot:p.bot,team:p.team,role:p.team,skin:p.skin,status:p.status,visible:!!visible,...(visible?{x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch}:{}),...((own||teammate)&&inMatch?{propId:p.propId}:{}),...(own?{water:p.water,changes:p.changes,decoys:p.decoys,locked:p.locked,ammo:p.ammo,reloadUntil:p.reloadUntil,exposed:p.exposedUntil>now,stillFor:p.stillAt?Math.round((now-p.stillAt)/1000):0}:{} )};
   }),
   objects:inMatch?objects.map(({id,type,x,y,z,angle,wet})=>({id,type,x,y:y||0,z,angle,wet})):[],
   effects:blind?[]:(r.effects||[]).filter(e=>now-e.at<1800&&(me.status==='found'||dist(eye,e)<35)&&(e.kind!=='idle'||me.team==='hunter'||e.owner===id)),

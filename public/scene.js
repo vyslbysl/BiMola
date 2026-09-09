@@ -2,6 +2,7 @@ import {EYE_HEIGHT,GUN_POSITION,MUZZLE_LOCAL} from './weapon.js';
 import {buildMapProp,buildMapArchitecture} from './map-models.js';
 import * as THREE from '/vendor/three.module.js';
 import {moveSpectator} from './spectator.js';
+import {buildSkin,skinFor,DEFAULT_SKIN} from './skins.js';
 import {installHiggsfieldMaterials} from './materials.js';
 import {mapFor,wallBoxes,terrainBoxes,ROOM,walls,props as initialProps,propTypes,dimensions,objectDistance,hitParts} from './world.js';
 
@@ -217,7 +218,10 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  // A tiny offscreen render of each disguise, so choosing one shows the actual object rather than a
  // typographic stand-in. Rendered once per type on demand and cached as a data URL.
  const previewCache=new Map();let previewRenderer=null,previewScene=null,previewCamera=null;
- function preview(type){
+ // `build` verilmezse eşya modeli kurulur; verilirse figürü çağıran üretir (avcı karakteri gibi).
+ // `floor` kareyi o yükseklikten yukarısına odaklar: tam boy bir figürde şapka ve yaka 62 pikselde
+ // kaybolduğu için karakter önizlemesi kalçadan yukarısını gösterir.
+ function preview(type,build=null,floor=null){
   if(previewCache.has(type))return previewCache.get(type);
   let url='';
   try{
@@ -230,8 +234,9 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
     const key=new THREE.DirectionalLight('#fff6e2',2.3);key.position.set(2.4,3.4,2.8);previewScene.add(key);
     previewCamera=new THREE.PerspectiveCamera(32,1,.04,40);
    }
-   const model=propModel(type);previewScene.add(model);model.updateMatrixWorld(true);
-   const bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3()),centre=bounds.getCenter(new THREE.Vector3());
+   const model=build?build():propModel(type);previewScene.add(model);model.updateMatrixWorld(true);
+   const bounds=new THREE.Box3().setFromObject(model);if(floor!==null)bounds.min.y=Math.max(bounds.min.y,floor);
+   const size=bounds.getSize(new THREE.Vector3()),centre=bounds.getCenter(new THREE.Vector3());
    const reach=Math.max(size.x,size.y,size.z,.2),distance=reach*2.3+.3;
    previewCamera.position.set(centre.x+distance*.72,centre.y+distance*.52,centre.z+distance*.74);
    previewCamera.lookAt(centre);previewCamera.updateProjectionMatrix();
@@ -241,11 +246,18 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   }catch(error){url='';}
   previewCache.set(type,url);return url;
  }
- const people=new Map();function avatar(team){
-  const g=new THREE.Group(),shirt=team==='hunter'?m.teal:m.terracotta,skin=mat('#c59776'),pants=m.navy;
+ // Avcı karakterinin giyim katmanı skins.js'ten gelir. Baş, yüz ve beden geometrisi üç karakterde
+ // de birebir aynı çizilir; yalnızca kıyafet, başlık ve renkler değişir. Kılığın takım rengi
+ // (teal) her karakterde bir aksesuar olarak durur, böylece avcı uzaktan hâlâ avcı gibi okunur.
+ const skinStyles=new Map();
+ const styleFor=id=>{const key=skinFor(id);if(!skinStyles.has(key))skinStyles.set(key,buildSkin(mapContext,key,new THREE.Group())||{});return skinStyles.get(key);};
+ const people=new Map();function avatar(team,skinId=DEFAULT_SKIN){
+  const g=new THREE.Group(),skin=mat('#c59776');
+  const style=team==='hunter'?buildSkin(mapContext,skinFor(skinId),g)||{}:{};
+  const shirt=style.shirt||(team==='hunter'?m.teal:m.terracotta),pants=style.pants||m.navy;
   round(.43,.48,.24,.065,0,1.15,0,shirt,g);round(.36,.18,.23,.055,0,.88,0,pants,g);
   cyl(.06,.075,.11,0,1.45,0,skin,g);sphere(.135,0,1.61,-.012,skin,g,.88,1.12,.88);
-  sphere(.14,0,1.69,.01,m.black,g,.9,.6,.9);
+  if(style.hair!==false)sphere(.14,0,1.69,.01,m.black,g,.9,.6,.9);
   for(const x of [-.044,.044]){sphere(.013,x,1.63,-.121,m.white,g);sphere(.006,x,1.628,-.132,m.black,g);}
   sphere(.025,0,1.586,-.135,skin,g,.65,.7,1);rod([-.024,1.55,-.119],[.024,1.55,-.119],.003,m.terracotta,g);
   const limbs=[];
@@ -258,7 +270,9 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
    if(team==='hunter'){rod([0,-.25,0],[side<0?.30:.015,-.12,-.28],.048,skin,arm);sphere(.054,side<0?.30:.015,-.12,-.28,skin,arm);}else{cyl(.052,.04,.22,0,-.35,0,skin,arm);sphere(.05,0,-.47,0,skin,arm);limbs.push(arm);}
   }
   if(team==='hunter'){const pivot=new THREE.Group();pivot.position.y=EYE_HEIGHT;const held=gun.clone(true);held.visible=true;held.position.set(GUN_POSITION.x,GUN_POSITION.y,GUN_POSITION.z);held.rotation.set(0,0,0);held.children.filter(c=>c.userData.firstPersonOnly).forEach(c=>held.remove(c));pivot.add(held);for(const side of [-1,1]){const shoulder=[side*.245,1.33-EYE_HEIGHT,0],elbow=[side*.30,1.03-EYE_HEIGHT,-.21],hand=side===1?[GUN_POSITION.x+.025,GUN_POSITION.y-.15,GUN_POSITION.z+.12]:[GUN_POSITION.x-.08,GUN_POSITION.y-.04,GUN_POSITION.z-.08];rod(shoulder,elbow,.064,shirt,pivot);sphere(.056,...elbow,skin,pivot);rod(elbow,hand,.048,skin,pivot);sphere(.052,...hand,skin,pivot);}g.add(pivot);g.userData.weaponPivot=pivot;}
-  g.userData.limbs=limbs;g.userData.team=team;contact(0,0,.75,.6,g);scene.add(g);return g;
+  // Sahneye eklemek çağırana bırakılır: aynı kurucu, seçim ekranının önizleme karesi için de
+  // sahne dışında bir figür üretebiliyor.
+  g.userData.limbs=limbs;g.userData.team=team;g.userData.skin=team==='hunter'?skinFor(skinId):null;contact(0,0,.75,.6,g);return g;
  }
  const gun=new THREE.Group();camera.add(gun);gun.position.set(GUN_POSITION.x,GUN_POSITION.y,GUN_POSITION.z);
  const aqua=mat('#63c4c4',{roughness:.3}),navy=mat('#28484a',{roughness:.42}),coral=mat('#f4a252',{roughness:.37}),skin=mat('#d6a482',{roughness:.65});
@@ -291,7 +305,11 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  }
  function clearEffect(fx){scene.remove(fx.g);fx.material.dispose();fx.silhouette?.children.forEach(o=>o.geometry.dispose());}
  function animateEffects(now){for(let i=revealEffects.length-1;i>=0;i--){const fx=revealEffects[i],age=(now-fx.start)/1000;if(age>=1.5){clearEffect(fx);revealEffects.splice(i,1);continue;}const k=age/1.5;fx.material.opacity=.9*(1-k);fx.ring.scale.setScalar(1+age*(fx.spread??(reducedMotion?.5:2.2)));for(const piece of fx.pieces){piece.position.copy(piece.userData.start).addScaledVector(piece.userData.velocity,reducedMotion?age*.15:age);piece.position.y=Math.max(.05,piece.position.y-age*age*1.8);piece.rotation.set(age*3,age*2,age);piece.scale.multiplyScalar(.994);}if(fx.silhouette){fx.silhouette.position.y=age*.25;fx.silhouette.scale.setScalar(1+Math.sin(Math.min(1,age*3)*Math.PI)*.12);}}}
- function sync(state,myId){currentState=state;currentId=myId;if(!state)return;useMap(state.settings?.mapId||'loft');for(const effect of state.effects||[])addEffect(effect,state.now-effect.at);updateObjects(state.objects?.length?state.objects:mapFor(state.settings?.mapId||'loft').fixtures);const visibleIds=new Set();for(const p of state.players||[]){const team=p.role||p.team;if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||p.status==='found'||p.propId)continue;visibleIds.add(p.id);let g=people.get(p.id);if(g&&g.userData.team!==team){scene.remove(g);people.delete(p.id);g=null;}if(!g){g=avatar(team);g.position.set(p.x,p.y||0,p.z);people.set(p.id,g);}g.userData.target=new THREE.Vector3(p.x,p.y||0,p.z);g.userData.angle=p.yaw||0;if(g.userData.weaponPivot)g.userData.weaponPivot.rotation.x=p.pitch||0;g.visible=p.id!==myId;}for(const[id,g]of people)if(!visibleIds.has(id))g.visible=false;for(const shot of state.shots||[])addShot(shot);}
+ function sync(state,myId){currentState=state;currentId=myId;if(!state)return;useMap(state.settings?.mapId||'loft');for(const effect of state.effects||[])addEffect(effect,state.now-effect.at);updateObjects(state.objects?.length?state.objects:mapFor(state.settings?.mapId||'loft').fixtures);const visibleIds=new Set();for(const p of state.players||[]){const team=p.role||p.team;if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||p.status==='found'||p.propId)continue;visibleIds.add(p.id);let g=people.get(p.id);
+  // Takımlar tur arası yer değiştirdiğinde model yeniden kurulur; seçilen avcı karakteri de aynı
+  // karşılaştırmaya girer, yoksa saklananken kurulan gövde avcı olunca eski kalırdı.
+  const look=team==='hunter'?skinFor(p.skin):null;
+  if(g&&(g.userData.team!==team||g.userData.skin!==look)){scene.remove(g);people.delete(p.id);g=null;}if(!g){g=avatar(team,p.skin);scene.add(g);g.position.set(p.x,p.y||0,p.z);people.set(p.id,g);}g.userData.target=new THREE.Vector3(p.x,p.y||0,p.z);g.userData.angle=p.yaw||0;if(g.userData.weaponPivot)g.userData.weaponPivot.rotation.x=p.pitch||0;g.visible=p.id!==myId;}for(const[id,g]of people)if(!visibleIds.has(id))g.visible=false;for(const shot of state.shots||[])addShot(shot);}
  const tempVec=new THREE.Vector3(),cameraTarget=new THREE.Vector3(),focus=new THREE.Vector3();
  let frameCount=0,frameSum=0,frameTicks=0;
  // Kamera ile kılık arasında kalan duvar, tavan paneli veya mobilya o kare boyunca gizlenir:
@@ -358,7 +376,11 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   camera.lookAt(focus);
   if(refreshOccluders)hideOccluders(camera.position,cameraTarget,myObject);
   const body=people.get(myId);if(body)body.visible=!myObject&&own.status!=='found';gun.visible=false;}
- else{showAll();const desired=pos.clone().add(new THREE.Vector3(0,EYE_HEIGHT,0));if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*27));camera.rotation.set(Math.max(-1.35,Math.min(1.35,pitch)),yaw,0,'YXZ');gun.visible=!!entered&&own.status!=='found';gun.position.set(GUN_POSITION.x,GUN_POSITION.y+Math.sin(t*.002)*.003,GUN_POSITION.z+recoil*.04);gun.rotation.set(recoil*.16,0,-recoil*.07);const fill=Math.max(.02,Math.min(1,(own.ammo??100)/100));waterFill.scale.y=fill;waterFill.position.y=.148+.065*fill;}}
+ else{showAll();const desired=pos.clone().add(new THREE.Vector3(0,EYE_HEIGHT,0));if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*27));camera.rotation.set(Math.max(-1.35,Math.min(1.35,pitch)),yaw,0,'YXZ');gun.visible=!!entered&&own.status!=='found';
+  // Avcı kendi modelini hiç görmez, yalnızca bu kolu: kolluk seçtiği karakterin kumaşını alır,
+  // yoksa oyuncu turda kendi seçiminin izini göremezdi.
+  const sleeve=styleFor(own.skin).shirt||m.cream;if(arm.material!==sleeve)arm.material=sleeve;
+  gun.position.set(GUN_POSITION.x,GUN_POSITION.y+Math.sin(t*.002)*.003,GUN_POSITION.z+recoil*.04);gun.rotation.set(recoil*.16,0,-recoil*.07);const fill=Math.max(.02,Math.min(1,(own.ammo??100)/100));waterFill.scale.y=fill;waterFill.position.y=.148+.065*fill;}}
  else{showAll();gun.visible=false;camera.position.set(-11.9,1.9,8.8);camera.lookAt(-5.5,.75,3.8);}
  wasPlaying=!!playing;for(let i=shots.length-1;i>=0;i--){const shot=shots[i],age=(performance.now()-shot.start)/1000;shot.streak.visible=age<.15;shot.streak.material.opacity=Math.max(0,.65-age*4);for(const p of shot.g.children){if(!p.userData.velocity)continue;p.position.addScaledVector(p.userData.velocity,dt);p.userData.velocity.y-=dt*4;p.scale.multiplyScalar(.97);}if(age>.5){scene.remove(shot.g);shot.streak.geometry.dispose();shot.streak.material.dispose();shots.splice(i,1);}}
  animateEffects(performance.now());renderer.render(scene,camera);
@@ -372,7 +394,10 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  function reset(){useMap('loft');for(const fx of revealEffects)clearEffect(fx);revealEffects.length=0;seenEffects.clear();own=null;currentState=null;currentId=null;wasPlaying=false;for(const p of people.values())p.visible=false;updateObjects(initialProps);for(const shot of shots)scene.remove(shot.g);shots.length=0;seenShots.clear();}
  const resize=()=>{const width=container.clientWidth||innerWidth,height=container.clientHeight||innerHeight;camera.aspect=width/height;camera.updateProjectionMatrix();renderer.setSize(width,height);};window.addEventListener('resize',resize);resize();
  applyQuality(quality,false);
- const api={renderer,camera,sync,render,reset,kick:()=>{recoil=1;},pickObject,preview,
+ // Seçim kartındaki figür, sahnede kullanılan avatarın kendisidir: kartta gördüğün karakter
+ // turda karşına çıkanla aynı, ikinci bir "vitrin modeli" yok.
+ const skinPreview=id=>preview('skin:'+skinFor(id),()=>avatar('hunter',id),.72);
+ const api={renderer,camera,sync,render,reset,kick:()=>{recoil=1;},pickObject,preview,skinPreview,
   quality:()=>quality,gpu:()=>gpuName,autoQuality:()=>autoQuality,
   setQuality:name=>{renderScale=1;autoQuality=false;applyQuality(name,true);return quality;},
   shadows:()=>renderer.shadowMap.enabled,shadowsWanted:()=>shadowsOn,

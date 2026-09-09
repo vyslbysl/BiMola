@@ -1,4 +1,5 @@
 import {MAP_CHOICES} from './maps.js';
+import {SKINS,DEFAULT_SKIN,skinFor} from './skins.js';
 import {createScene} from './scene.js';
 import {createAudio} from './audio.js';
 import {propTypes} from './world.js';
@@ -65,7 +66,7 @@ for(const d of document.querySelectorAll('dialog'))d.addEventListener('close',st
 try{$('name').value=localStorage.getItem('mola-name')||'Misafir';}catch{}
 function chooseRole(role){selectedRole=role;document.querySelectorAll('[data-role]').forEach(b=>{const yes=b.dataset.role===role;b.classList.toggle('selected',yes);b.setAttribute('aria-pressed',yes);});}
 for(const b of document.querySelectorAll('[data-role]'))b.onclick=()=>chooseRole(b.dataset.role);
-function openPlay(newMode){mode=newMode;$('quick-map-field').classList.toggle('hidden',mode!=='quick');paintMapGrid('quick-map-grid',quickMap);$('play-error').textContent='';$('join-code-field').classList.toggle('hidden',mode!=='join');$('play-description').textContent=mode==='quick'?"3'e 3 hızlı oyun. Eksik yerleri botlar tamamlar.":mode==='create'?`${draft.teamSize}'e ${draft.teamSize} oda. Takımını seç, arkadaşlarını çağır.`:'Arkadaşının kodunu yaz ve takımını seç.';$('play-title').textContent=mode==='join'?'Arkadaşlarının yanına gel.':'Bugün kim olacaksın?';$('confirm-play').textContent=mode==='quick'?'Hızlı oyuna başla →':mode==='create'?'Odayı oluştur →':'Odaya katıl →';showDialog('play-dialog');}
+function openPlay(newMode){mode=newMode;ensureSkinGrid();$('quick-map-field').classList.toggle('hidden',mode!=='quick');paintMapGrid('quick-map-grid',quickMap);$('play-error').textContent='';$('join-code-field').classList.toggle('hidden',mode!=='join');$('play-description').textContent=mode==='quick'?"3'e 3 hızlı oyun. Eksik yerleri botlar tamamlar.":mode==='create'?`${draft.teamSize}'e ${draft.teamSize} oda. Takımını seç, arkadaşlarını çağır.`:'Arkadaşının kodunu yaz ve takımını seç.';$('play-title').textContent=mode==='join'?'Arkadaşlarının yanına gel.':'Bugün kim olacaksın?';$('confirm-play').textContent=mode==='quick'?'Hızlı oyuna başla →':mode==='create'?'Odayı oluştur →':'Odaya katıl →';showDialog('play-dialog');}
 $('quick').onclick=()=>openPlay('quick');$('join-open').onclick=()=>openPlay('join');
 // Harita listeden değil, önizlemeli kartlardan seçilir: hangi mekâna gireceğini okumak yerine
 // görüyorsun. Aynı kart ızgarası hem 'Hemen oyna' hem 'Kendi odanı kur' ekranında kullanılır.
@@ -84,6 +85,27 @@ function paintMapGrid(id,current){for(const card of $(id).children){const on=car
 buildMapGrid('map-grid',id=>{draft.mapId=id;paintMapGrid('map-grid',id);updateSettings();});
 buildMapGrid('quick-map-grid',id=>{quickMap=id;paintMapGrid('quick-map-grid',id);});
 paintMapGrid('quick-map-grid',quickMap);
+// Avcı karakteri harita kartlarıyla aynı yolu izler: figür world.skinPreview ile sahnedeki gerçek
+// avatardan üretilir, WebGL önizleme veremezse eşya şeridi gibi harfe düşer. Seçim odanın değil
+// oyuncunun ayarı, o yüzden ad gibi tarayıcıda saklanır ve katılırken gönderilir.
+let selectedSkin=DEFAULT_SKIN,skinGridReady=false;
+try{selectedSkin=skinFor(localStorage.getItem('mola-skin'));}catch{}
+function pickSkin(id){selectedSkin=skinFor(id);try{localStorage.setItem('mola-skin',selectedSkin);}catch{}paintSkinGrid();}
+function paintSkinGrid(){for(const card of $('skin-grid').children){const on=card.dataset.skin===selectedSkin;card.classList.toggle('selected',on);card.setAttribute('aria-checked',on?'true':'false');card.tabIndex=on?0:-1;}}
+// Kartlar ilk açılışta kurulur: üç önizleme karesi ancak oyuncu ekrana geldiğinde çizilir.
+function ensureSkinGrid(){
+ if(!skinGridReady){skinGridReady=true;$('skin-grid').replaceChildren(...SKINS.map(entry=>{
+  const card=document.createElement('button');card.type='button';card.className='skin-card';card.dataset.skin=entry.id;
+  card.setAttribute('role','radio');card.title=entry.name+' — '+entry.note;
+  const shot=world.skinPreview?.(entry.id),art=document.createElement('b');
+  if(shot){const image=document.createElement('img');image.src=shot;image.alt='';card.append(image);}
+  else{art.textContent=entry.name.slice(0,1);card.append(art);}
+  const name=document.createElement('strong');name.textContent=entry.name;
+  const note=document.createElement('span');note.textContent=entry.note;
+  card.append(name,note);card.onclick=()=>pickSkin(entry.id);return card;
+ }));}
+ paintSkinGrid();
+}
 const mapName=id=>MAP_CHOICES.find(m=>m.id===id)?.name||id;
 for(let i=1;i<=12;i++){const o=document.createElement('option');o.value=i;o.textContent=`${i} kişi · ${i}'e ${i}`;$('team-size').append(o);}
 // Ayar ekranı iki yerde ikiye katlanmış seçeneklerle şişmişti. Aynı şeyi anlatanlar tek dile
@@ -112,7 +134,7 @@ for(const id of ['map-rotate','density','team-size','team-selection','bot-mode',
 $('create').onclick=()=>showSettings(defaults,false);$('settings-open').onclick=()=>showSettings(state?.settings||draft,!!state);
 $('save-settings').onclick=()=>{const s=readSettings();if(s.botMode==='custom'&&(s.hiderBots<0||s.hunterBots<0||s.hiderBots>s.teamSize||s.hunterBots>s.teamSize)){ $('settings-error').textContent='Bot sayısı 0 ile takım kapasitesi arasında olmalı.';return;}draft=s;if(editSettings){request('settings',s,r=>{if(r.error)$('settings-error').textContent=r.error;else $('settings-dialog').close();});}else{$('settings-dialog').close();openPlay('create');}};
 $('confirm-play').onclick=async()=>{if(!socket.connected){$('play-error').textContent='Sunucuya bağlanılması bekleniyor.';return;}const code=mode==='join'?$('code').value.replace(/\D/g,''):'';if(mode==='join'&&code.length!==4){$('play-error').textContent='4 haneli oda kodunu yaz.';return;}$('confirm-play').disabled=true;try{localStorage.setItem('mola-name',$('name').value);}catch{}
- request('join',{name:$('name').value,role:selectedRole,practice:mode==='quick',code,settings:mode==='quick'?{...defaults,mapId:quickMap,botMode:'fill'}:draft},r=>{$('confirm-play').disabled=false;if(r.error){$('play-error').textContent=r.error;return;}myId=r.id;lastRound=0;lastPhase='';teamSignature='';pickerHush='';pickerAuto=false;entered=false;closeDialogs();$('error').textContent='';});};
+ request('join',{name:$('name').value,role:selectedRole,skin:selectedSkin,practice:mode==='quick',code,settings:mode==='quick'?{...defaults,mapId:quickMap,botMode:'fill'}:draft},r=>{$('confirm-play').disabled=false;if(r.error){$('play-error').textContent=r.error;return;}myId=r.id;lastRound=0;lastPhase='';teamSignature='';pickerHush='';pickerAuto=false;entered=false;closeDialogs();$('error').textContent='';});};
 function leave(){releaseMouse();socket.emit('leave');closeDialogs();unlock();state=null;myId=null;lastPhase='';world.reset();setScreen('home');}
 document.querySelectorAll('.exit').forEach(b=>b.onclick=leave);
 async function copyInvite(){if(!state)return;try{await navigator.clipboard.writeText(location.origin+'/?room='+state.code);toast('Davet bağlantısı kopyalandı.');}catch{toast('Oda kodu: '+state.code);}}
