@@ -1,3 +1,4 @@
+import {clampHiderCamera} from './camera.js';
 import {EYE_HEIGHT,CROUCH_EYE_HEIGHT,eyeHeight,GUN_POSITION,MUZZLE_LOCAL} from './weapon.js';
 import {buildMapProp,buildMapArchitecture} from './map-models.js';
 import * as THREE from '/vendor/three.module.js';
@@ -41,7 +42,41 @@ export function createScene(container){
  const m={oak:mat('#ffffff',{map:timber,roughness:.5,bumpMap:timber,bumpScale:.009}),floor:mat('#e7d3b3',{map:oak,roughness:.53,bumpMap:oak,bumpScale:.028}),wall:mat('#f8f4e8',{map:plaster,bumpMap:plaster,bumpScale:.01,roughness:.92}),white:mat('#f5f1e8',{roughness:.4}),cream:mat('#efe4ce',{map:linen,bumpMap:linen,bumpScale:.008}),terracotta:mat('#c1805e',{map:linen,bumpMap:linen,bumpScale:.008}),teal:mat('#457b79',{roughness:.4}),orange:mat('#f5a947',{roughness:.4}),rattan:mat('#ffffff',{map:woven,bumpMap:woven,bumpScale:.018}),stone:mat('#f6f2e7',{map:terrazzo,bumpMap:terrazzo,bumpScale:.003,roughness:.38}),brass:mat('#b1a07a',{metalness:.78,roughness:.3}),metal:mat('#c2c7bd',{metalness:.83,roughness:.25}),black:mat('#353b37',{roughness:.68}),rubber:mat('#28312e',{roughness:.9}),soil:mat('#3c3326',{roughness:1}),leaf:mat('#426b38',{roughness:.65,side:THREE.DoubleSide}),leafLight:mat('#73954a',{roughness:.68,side:THREE.DoubleSide}),leafDark:mat('#2e5631',{roughness:.75,side:THREE.DoubleSide}),paper:mat('#e8dfcc'),navy:mat('#415564'),pink:mat('#c09182'),blue:mat('#7fa3ae'),water:mat('#31bce4',{roughness:.1,metalness:.1,transparent:true,opacity:.77}),glass:mat('#d7f1ea',{transparent:true,opacity:.18,roughness:.12,metalness:.2,depthWrite:false}),rug:mat('#fff8e9',{map:rugMap,roughness:1,bumpMap:rugMap,bumpScale:.01})};
 
  const screenMap=canvasTexture(256,256,(ctx,w,h)=>{ctx.fillStyle='#172e4d';ctx.fillRect(0,0,w,h);for(let i=0;i<70;i++){ctx.fillStyle=['#e6b960','#77a5b1','#e99b85'][i%3];ctx.fillRect(rand()*w,rand()*h,2,2);}for(let i=0;i<5;i++){ctx.strokeStyle=['#d99677','#8bb5a9'][i%2];ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(128,128,30+i*18,20+i*10,-.35,0,Math.PI*2);ctx.stroke();}});
+ m.asphalt=mat('#56616a',{roughness:.98});m.portConcrete=mat('#a2a9a4',{roughness:.92});
+ m.portRoof=mat('#6e838b',{roughness:.7});m.crane=mat('#dca347',{roughness:.58});
+ m.portSea=mat('#346b7d',{roughness:.28,metalness:.15});m.portHull=mat('#304852',{roughness:.7});
  const mapMaterials={awning:mat('#87afb4'),cobalt:mat('#344d77'),yellow:mat('#ead586'),coral:mat('#d88c74'),screen:mat('#ffffff',{map:screenMap,emissive:'#5d88a2',emissiveMap:screenMap,emissiveIntensity:.25,roughness:.35}),marquee:mat('#e0b761',{emissive:'#b77d38',emissiveIntensity:.15}),glow:mat('#e4b6dc',{emissive:'#c58faf',emissiveIntensity:.35}),window:mat('#cbdde1',{emissive:'#b4d0d7',emissiveIntensity:.28}),skyline:mat('#bac3c4'),sea:mat('#78adb9',{roughness:.35})};
+ // Small, cached screen textures make each department's tools recognisable.
+ const officeDisplay=(kind)=>{
+  const texture=canvasTexture(512,320,(ctx,w,h)=>{
+   ctx.fillStyle=kind==='code'?'#152838':'#eef3f1';ctx.fillRect(0,0,w,h);
+   ctx.fillStyle='#294555';ctx.fillRect(0,0,w,35);ctx.fillStyle='#eef6f4';ctx.font='bold 16px sans-serif';
+   ctx.fillText({code:'API / SERVICES',mobile:'DEVICE LAB',kanban:'BACKLOG     IN PROGRESS     DONE',diagram:'SYSTEM / DATA FLOW',design:'DESIGN / COMPONENTS'}[kind],18,24);
+   if(kind==='code'){
+    ctx.font='15px monospace';['async function handleRequest() {','  const data = await repository.find();','  return response.json(data);','}','GET /api/projects    200 OK','POST /api/builds     201 CREATED','tests: passed   build: ready'].forEach((line,i)=>{ctx.fillStyle=i%2?'#8dc5b3':'#dfc48c';ctx.fillText(line,22,70+i*31);});
+   }else if(kind==='kanban'){
+    for(let col=0;col<3;col++)for(let row=0;row<3;row++){ctx.fillStyle=['#e4c78e','#b4c9df','#a8c9ba'][col];ctx.fillRect(18+col*165,53+row*82,146,66);ctx.fillStyle='#5c6d71';ctx.fillRect(28+col*165,67+row*82,95,5);ctx.fillRect(28+col*165,81+row*82,70,4);}
+   }else if(kind==='diagram'){
+    ctx.strokeStyle='#597f8d';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(80,150);ctx.lineTo(430,150);ctx.moveTo(250,150);ctx.lineTo(250,250);ctx.stroke();
+    for(const [x,y,label]of [[20,110,'API'],[190,110,'SERVICE'],[360,110,'DB'],[190,230,'CACHE']]){ctx.fillStyle='#b5ced0';ctx.fillRect(x,y,130,60);ctx.fillStyle='#294555';ctx.font='bold 18px sans-serif';ctx.fillText(label,x+15,y+36);}
+   }else{
+    ctx.fillStyle='#b6ccdd';ctx.fillRect(20,54,140,242);ctx.fillStyle='#638c93';ctx.fillRect(181,54,307,65);
+    for(let i=0;i<3;i++){ctx.fillStyle=['#d6bfce','#d8c89c','#9dbcb0'][i];ctx.fillRect(181+i*103,135,90,110);}
+    ctx.fillStyle='#456473';ctx.fillRect(181,264,220,20);
+   }
+  });return mat('#ffffff',{map:texture,emissive:'#ffffff',emissiveMap:texture,emissiveIntensity:.18,roughness:.5});
+ };
+ for(const kind of ['code','mobile','kanban','diagram','design'])mapMaterials[kind+'Display']=officeDisplay(kind);
+ mapMaterials.statusLed=mat('#86d3ad',{emissive:'#62c89c',emissiveIntensity:.6});
+ for(const [name,color]of Object.entries({officeWarm:'#bfae91',officeBlue:'#aebdca',officeMint:'#b7c8bf',officeSand:'#cfc5ad',officeSlate:'#9caebc',officeRose:'#cbbac5'}))m[name]=mat(color,{roughness:.96});
+ const signMaterials=new Map();
+ function label(text,x,y,z,angle,width,height,parent){
+  if(!signMaterials.has(text)){
+   const texture=canvasTexture(1024,128,(ctx,w,h)=>{ctx.fillStyle='#25404b';ctx.fillRect(0,0,w,h);ctx.fillStyle='#f3f1de';ctx.font='bold 62px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,w/2,h/2,w-40);});
+   signMaterials.set(text,mat('#ffffff',{map:texture,roughness:.8}));
+  }
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(width,height),signMaterials.get(text));sign.position.set(x,y,z);sign.rotation.y=angle;parent.add(sign);return sign;
+ }
  // Material roles are shared by movable props and furniture, so disguises stay visually identical.
  m.sage=mat('#8b9f94',{roughness:.72});
  m.clay=mat('#ae7154',{roughness:.79});
@@ -183,7 +218,7 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  // The entrance has a generous arch-like frame, a panelled oak door and small glazing.
  box(3.1,3.6,.13,0,1.8,17.78,m.oak);for(const side of [-1,1]){box(1.32,3.34,.08,side*.72,1.73,17.68,m.white);box(1.15,2.25,.045,side*.72,2.19,17.62,m.glass).castShadow=false;rod([side*.19,1.05,17.55],[side*.19,1.4,17.55],.021,m.brass);}
  bake(architecture);for(const piece of hideable)bake(piece);
- const mapContext={THREE,box,round,cyl,sphere,torus,rod,plant,m,mapMaterials,shellPiece,bake};
+ const mapContext={THREE,box,round,cyl,sphere,torus,rod,plant,m,mapMaterials,shellPiece,bake,label};
  const loftPieces=[...hideable];let activeMap='loft',mapArchitecture=null,currentRoom=ROOM;
  function useMap(id='loft'){
   const map=mapFor(id);if(map.id===activeMap)return;showAll();
@@ -193,10 +228,16 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   architecture.visible=outside.visible=map.id==='loft';
   if(map.id==='loft')hideable.push(...loftPieces);else{mapArchitecture=buildMapArchitecture(mapContext,map);scene.add(mapArchitecture);}
   currentRoom=map.room;activeMap=map.id;wasPlaying=false;
+  const span=Math.max(map.room.width,map.room.depth),large=span>40;
+  camera.far=Math.max(170,span*2);camera.updateProjectionMatrix();
+  scene.fog.near=large?110:62;scene.fog.far=large?220:150;
+  const shadowSpan=large?span*.65:27;
+  Object.assign(sun.shadow.camera,{left:large?-shadowSpan:-25,right:large?shadowSpan:25,top:shadowSpan,bottom:-shadowSpan,far:large?250:85});
+  sun.shadow.camera.updateProjectionMatrix();
   for(const g of objectModels.values()){scene.remove(g);disposeModel(g);}objectModels.clear();
   for(const mesh of collisionMeshes)mesh.geometry.dispose();collisionMeshes.length=0;
   for(const {x,z,w,d,h,y}of [...wallBoxes(map.id),...terrainBoxes(map.id)]){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),collisionMaterial);mesh.position.set(x,y+h/2,z);mesh.updateMatrixWorld();collisionMeshes.push(mesh);}
-  sun.position.set(map.id==='greenhouse'?20:26,map.id==='museum'?32:22,5);renderer.shadowMap.needsUpdate=true;
+  sun.position.set(large?70:map.id==='greenhouse'?20:26,large?90:map.id==='museum'?32:22,large?25:5);renderer.shadowMap.needsUpdate=true;
  }
  // Movable objects. Each is merged locally so 24 players can share a rich room.
  const modelCache=new Map();
@@ -381,8 +422,7 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   // Yükseğe asılı kılıklarda (duvardaki tablo, tavandaki lamba) kamera daha geriden ve daha
   // aşağıdan bakar, böylece ekranı tavan değil oda doldurur; alçak kılıklarda hafif yukarıdan.
   const rise=highUp>0?-Math.min(1.35,highUp*.85+.25):.5;
-  desired.y=Math.max(.55,Math.min(currentRoom.height-.75,desired.y+rise));
-  desired.x=Math.max(-24,Math.min(24,desired.x));desired.z=Math.max(-26,Math.min(26,desired.z));
+  desired.y+=rise;clampHiderCamera(desired,currentRoom);
   if(!wasPlaying)camera.position.copy(desired);else camera.position.lerp(desired,1-Math.exp(-dt*24));
   // Yükseğe asılı kılıkta tam nesneye bakmak kareyi tavanla doldurur; bakış noktası biraz aşağı
   // alınınca hem kılık üstte görünür hem oda görünür kalır.
