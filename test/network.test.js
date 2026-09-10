@@ -52,3 +52,17 @@ test('different map rooms keep their own packets and serve all map assets',{time
   for(const path of ['/maps.js','/map-models.js','/maps/references/market.jpeg','/maps/references/greenhouse.jpeg','/maps/references/arcade.jpeg','/maps/references/museum.jpeg','/maps/references/hotel.jpeg','/maps/references/loft.jpeg']){const response=await fetch(url+path,{method:'HEAD'});assert.equal(response.status,200,path);}
  }finally{a?.disconnect();b?.disconnect();g.close();}
 });
+test('active rooms are listed and a mid-round joiner waits for the next round',{timeout:12000},async()=>{
+ const {g,url}=await setup();let host,player,late;
+ try{
+  host=await connect(url);player=await connect(url);late=await connect(url);
+  const made=await host.emitWithAck('join',{name:'Kurucu',role:'hunter',settings:{teamSize:2,botMode:'off',swapTeams:false,mapRotate:false}});
+  await player.emitWithAck('join',{name:'Oyuncu',role:'hider',code:made.code});assert.ok((await host.emitWithAck('start')).ok);
+  const listed=await (await fetch(url+'/api/rooms')).json(),summary=listed.find(r=>r.code===made.code);assert.ok(summary);assert.equal(summary.phase,'prep');assert.equal(summary.players,2);
+  await delay(400);const waitingState=wait(late,'state'),joined=await late.emitWithAck('join',{name:'Sonradan',role:'hider',code:made.code});assert.equal(joined.waiting,true);const r=g.rooms.get(made.code);assert.equal(r.players[late.id].status,'waiting');
+  const waiting=await waitingState;assert.equal(waiting.phase,'waiting');assert.equal(waiting.currentPhase,'prep');assert.equal(waiting.objects,undefined);
+  const playing=await wait(host,'state');assert.equal(playing.players.some(p=>p.id===late.id),false,'sıradaki oyuncu devam eden turdan gizlenir');
+  r.phase='end';const admittedState=wait(late,'state');assert.ok((await host.emitWithAck('start')).ok);assert.equal(r.players[late.id].waiting,false);assert.equal(r.players[late.id].status,'alive');
+  const admitted=await admittedState;assert.equal(admitted.phase,'prep');assert.ok(Number.isFinite(admitted.players.find(p=>p.id===late.id).x));
+ }finally{host?.disconnect();player?.disconnect();late?.disconnect();g.close();}
+});

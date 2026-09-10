@@ -11,12 +11,13 @@ export function createGameServer(){
  const app=express(),http=createServer(app),io=new Server(http,{maxHttpBufferSize:4096,cors:{origin:true}});const rooms=new Map();
  app.use(express.static(fileURLToPath(new URL('./public',import.meta.url))));
  app.use('/vendor',express.static(fileURLToPath(new URL('./node_modules/three/build',import.meta.url))));app.get('/health',(_,res)=>res.json({ok:true}));
+ app.get('/api/rooms',(_,res)=>res.json([...rooms.values()].filter(r=>!r.practice).map(r=>{const humans=Object.values(r.players).filter(p=>!p.bot);return {code:r.code,phase:r.phase,mapId:r.settings.mapId,players:humans.length,capacity:r.settings.teamSize*2,waiting:humans.filter(p=>p.waiting).length,round:r.round||0};}).filter(r=>r.players<r.capacity)));
  function publish(r){const now=Date.now();for(const p of Object.values(r.players))if(!p.bot)io.to(p.id).emit('state',view(r,p.id,now));}
  function leave(s){
   const r=rooms.get(s.data.code);if(!r)return;
   const p=r.players[s.id];if(p?.propId){const object=r.objects?.find(o=>o.id===p.propId);if(object)delete object.owner;}
   delete r.players[s.id];s.leave(r.code);s.data.code=null;
-  const humans=Object.values(r.players).filter(p=>!p.bot);if(!humans.length)rooms.delete(r.code);else{if(r.host===s.id)r.host=humans[0].id;if(['lobby','end'].includes(r.phase))syncBots(r);publish(r);}
+  const humans=Object.values(r.players).filter(p=>!p.bot);if(!humans.length)rooms.delete(r.code);else{if(r.host===s.id)r.host=humans.find(p=>!p.waiting)?.id||humans[0].id;if(['lobby','end'].includes(r.phase))syncBots(r);publish(r);}
  }
  io.on('connection',s=>{
   let lastJoin=0,lastAction=0;
@@ -27,7 +28,6 @@ export function createGameServer(){
    if(data.code){
     r=rooms.get(String(data.code).replace(/\D/g,''));if(!r)return ack({error:'Bu oda bulunamadı. Kodu kontrol et.'});
     if(r&&s.data.code===r.code)return ack({code:r.code,id:s.id});
-    if(!['lobby','end'].includes(r.phase))return ack({error:'Tur devam ediyor. Tur bitince tekrar katıl.'});
     if(Object.values(r.players).filter(p=>!p.bot).length>=r.settings.teamSize*2)return ack({error:`Oda dolu (${r.settings.teamSize*2} kişi).`});
     if(r.practice)return ack({error:'Bu bir antrenman odası. Yeni oda oluştur.'});
    }
@@ -40,9 +40,10 @@ export function createGameServer(){
    const humans=t=>Object.values(r.players).filter(p=>!p.bot&&p.team===t).length;
    if(r.settings.teamSelection==='auto')team=humans('hunter')<humans('hider')?'hunter':'hider';
    if(humans(team)>=r.settings.teamSize)team=team==='hunter'?'hider':'hunter';
-   r.players[s.id]=player(s.id,name,false,team,data.skin);s.data.code=r.code;s.join(r.code);syncBots(r);
+   const waiting=!!data.code&&!['lobby','end'].includes(r.phase);
+   r.players[s.id]=player(s.id,name,false,team,data.skin);r.players[s.id].waiting=waiting;if(waiting)r.players[s.id].status='waiting';s.data.code=r.code;s.join(r.code);if(!waiting)syncBots(r);
    if(r.practice){r.settings.botMode='fill';syncBots(r);start(r);r.phase='brief';r.until=0;}
-   ack({code:r.code,id:s.id});publish(r);
+   ack({code:r.code,id:s.id,waiting});publish(r);
   });
   s.on('ready',ack=>{const r=rooms.get(s.data.code);if(r?.practice&&r.host===s.id&&r.phase==='brief'){r.phase='prep';r.until=Date.now()+r.settings.hideSeconds*1000;if(typeof ack==='function')ack({ok:true});publish(r);}else if(typeof ack==='function')ack({error:'Antrenman hazır değil.'});});
   s.on('settings',(data,ack)=>{const r=rooms.get(s.data.code),result=r?configureRoom(r,data,s.id):{error:'Oda bulunamadı.'};if(typeof ack==='function')ack(result);if(r&&result.ok)publish(r);});

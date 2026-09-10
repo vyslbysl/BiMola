@@ -3,7 +3,7 @@ import {validMap,MAP_CHOICES} from './public/maps.js';
 import {SKINS,DEFAULT_SKIN,skinFor} from './public/skins.js';
 import {assembly,moveAssembly,detachChildren,settleObjects} from './public/physics.js';
 import {randomUUID} from 'node:crypto';
-import {mapFor,groundAt,free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,DEFAULT_DECOR,MIN_DECOR,MAX_DECOR,contains,homeKind,fitsHome} from './public/world.js';
+import {mapFor,groundAt,floorCoverHeight,free,sight,dist,propTypes,dimensions,objectDistance,reachable,blocksDoor,fixtures,nearestHit,pathTo,generateProps,zoneAt,zones,commonTypes,surfaceHeight,PLACEMENT_PAD,STAND_MAX_HEIGHT,BODY_HEIGHT,DEFAULT_PROP_COUNT,MIN_PROP_COUNT,MAX_PROP_COUNT,DEFAULT_DECOR,MIN_DECOR,MAX_DECOR,contains,homeKind,fitsHome} from './public/world.js';
 export {dist};
 // Kaç isabetin bir saklananı ortaya çıkardığı ve ıslanan saklananın kaçış hızı artık oda
 // ayarıdır; buradaki değerler yalnızca varsayılan.
@@ -98,6 +98,7 @@ export function start(r,now=Date.now()){
  r.settings=sanitizeSettings(r.settings);syncBots(r);
  // Takımların eşit olması gerekmiyor: her tarafta en az bir kişi varsa tur başlar.
  if(teams.some(team=>count(r,team)<1))return {error:'Başlamak için en az bir saklanan ve bir avcı olmalı. Takım seç veya bot ekle.'};
+ for(const p of Object.values(r.players))p.waiting=false;
  if((r.round||0)>0&&r.settings.swapTeams){for(const p of Object.values(r.players))p.team=p.role=p.team==='hunter'?'hider':'hunter';[r.settings.hunterBots,r.settings.hiderBots]=[r.settings.hiderBots,r.settings.hunterBots];}
  // Takımlar yer değiştirirken mekân da değişir: aynı odayı ezberleyen taraf avantaj kazanmasın.
  // Kurucu isterse ayarı kapatıp tek haritada kalabilir.
@@ -270,7 +271,7 @@ export function tick(r,now,dt){
  if(!['prep','play'].includes(r.phase))return;
  r.effects=(r.effects||[]).filter(e=>now-e.at<1800);
  dt=Math.max(0,Math.min(.1,dt));r.shots=r.shots.filter(s=>now-s.at<650);
- const ps=Object.values(r.players);
+ const ps=Object.values(r.players).filter(p=>!p.waiting);
  for(const p of ps){
   if(p.status!=='alive')continue;
   if(p.reloadUntil&&now>=p.reloadUntil){p.ammo=100;p.reloadUntil=0;}
@@ -287,12 +288,13 @@ export function tick(r,now,dt){
   const attempt=(nx,nz,ny=p.y,angle=o?.angle||0)=>{
    const floor=groundAt(nx,nz,r.objects),oldFloor=groundAt(p.x,p.z,r.objects);
    if(p.grounded&&Math.abs(p.y-oldFloor)<.15&&Math.abs(floor-oldFloor)<.15)ny=Math.max(floor,ny+floor-oldFloor);
+   if(o&&!propTypes[o.type].mounted)ny=Math.max(ny,floorCoverHeight(nx,nz,r.objects,o.id,{...o,angle}));
    if(o){const moved=moveAssembly(r,o,{x:nx,z:nz,y:ny,angle});if(moved){p.x=o.x;p.z=o.z;p.y=o.y;}return moved;}
    if(!free(nx,nz,radius,r.objects,null,ny,tall))return false;p.x=nx;p.z=nz;p.y=ny;return true;
   };
   if(len&&!p.locked){
    x/=len;z/=len;const speed=p.team==='hunter'?(p.crouch?CROUCH_SPEED:HUNTER_SPEED):p.water>0?HUNTER_SPEED*(r.settings?.escapeBoost||DEFAULT_ESCAPE):o?2.8:4;
-   for(const [axis,amount]of [['x',x*speed*dt],['z',z*speed*dt]]){const steps=Math.max(1,Math.ceil(Math.abs(amount)/.1));for(let i=0;i<steps;i++){if(!attempt(p.x+(axis==='x'?amount/steps:0),p.z+(axis==='z'?amount/steps:0)))break;if(o){o.anchored=false;const host=r.objects.find(q=>q.id===o.supportId);if(host&&!contains(host,o.x,o.z,-.035))delete o.supportId;}}}
+   for(const [axis,amount]of [['x',x*speed*dt],['z',z*speed*dt]]){const steps=Math.max(1,Math.ceil(Math.abs(amount)/.05));for(let i=0;i<steps;i++){if(!attempt(p.x+(axis==='x'?amount/steps:0),p.z+(axis==='z'?amount/steps:0)))break;if(o){o.anchored=false;const host=r.objects.find(q=>q.id===o.supportId);if(host&&!contains(host,o.x,o.z,-.035))delete o.supportId;}}}
   }
   const spin=Math.max(-1,Math.min(1,Number(p.input.spin)||0));
   if(o&&spin){const turns=Math.max(1,Math.ceil(Math.abs(spin*SPIN_SPEED*dt)/.035));for(let i=0;i<turns;i++)if(!attempt(p.x,p.z,p.y,(o.angle||0)+spin*SPIN_SPEED*dt/turns))break;}
@@ -355,11 +357,12 @@ export function tick(r,now,dt){
 }
 export function view(r,id,now=Date.now()){
  const me=r.players[id];if(!me)return null;
+ if(me.waiting)return {code:r.code,host:r.host,phase:'waiting',currentPhase:r.phase,until:r.until||0,now,round:r.round||0,settings:r.settings,practice:false,players:Object.values(r.players).filter(p=>!p.bot&&p.waiting).map(p=>({id:p.id,name:p.name,team:p.team,waiting:true}))};
  const inMatch=['prep','play','end','brief'].includes(r.phase),blind=me.team==='hunter'&&['prep','brief'].includes(r.phase);
  const spectator=me.status==='found'?Object.values(r.players).find(p=>p.team===me.team&&p.status==='alive'):null,eye=spectator||me;
  const objects=(blind?r.initialObjects:r.objects)||[];
  const packet={code:r.code,host:r.host,phase:r.phase,until:r.until||0,now,round:r.round||0,settings:r.settings,practice:!!r.practice,winner:r.winner,reason:r.reason,spectating:spectator?.id,
-  players:Object.values(r.players).map(p=>{
+  players:Object.values(r.players).filter(p=>!p.waiting).map(p=>{
    const own=p.id===id,teammate=p.team===me.team,transformed=!!p.propId;
    const visible=own||inMatch&&!blind&&(teammate||!transformed&&p.status==='alive'&&(me.status==='found'||dist(eye,p)<35&&sight(eye,p,r.objects)));
    // Görünüm ada benzer, gizli bir bilgi değil: her pakette gider, böylece takımlar yer

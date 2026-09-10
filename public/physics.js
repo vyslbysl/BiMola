@@ -1,4 +1,4 @@
-import {propTypes,dimensions,contains,free,blocksDoor,groundAt} from './world.js';
+import {propTypes,dimensions,contains,free,blocksDoor,groundAt,floorCoverHeight} from './world.js';
 
 export function supportedBy(child,parent){
  if(child.id===parent.id||child.decoyOf===parent.id)return false;
@@ -38,9 +38,9 @@ export function settleObjects(room,dt){
   const parent=room.objects.find(p=>p.id===o.supportId);
   if(parent)continue;
   delete o.supportId;
-  let ground=groundAt(o.x,o.z,room.objects),support=null;
+  let ground=floorCoverHeight(o.x,o.z,room.objects,o.id,o),support=null;
   for(const other of room.objects){if(other===o||other.supportId===o.id||other.decoyOf===o.id)continue;const t=propTypes[other.type];if(t.flat)continue;const top=(other.y||0)+(t.surface??t.height);if(t.height>=.06&&dimensions(o).w*dimensions(o).d<=dimensions(other).w*dimensions(other).d*1.1&&top<=(o.y||0)+.025&&top>ground&&contains(other,o.x,o.z,-.01)){ground=top;support=other;}}
   if((o.y||0)>ground+.005){o.fallSpeed=(o.fallSpeed||0)+18*dt;moveAssembly(room,o,{x:o.x,z:o.z,y:Math.max(ground,o.y-o.fallSpeed*dt),angle:o.angle},{check:false});}
-  else {o.fallSpeed=0;if(support)o.supportId=support.id;}
+  else {o.fallSpeed=0;if((o.y||0)<ground-.002)moveAssembly(room,o,{x:o.x,z:o.z,y:ground,angle:o.angle},{check:false});if(support)o.supportId=support.id;}
  }
 }

@@ -4,9 +4,10 @@ import {createScene} from './scene.js';
 import {createAudio} from './audio.js';
 import {propTypes} from './world.js';
 const $=id=>document.getElementById(id),socket=io(),audio=createAudio();let world;
+document.body.insertAdjacentHTML('beforeend','<dialog id="waiting-dialog"><div class="eyebrow">SONRAKİ TUR SIRASINDASIN</div><h2>Bu tur bitsin,<br>sen de oyundasın.</h2><p class="muted" id="waiting-note"></p><b class="waiting-code" id="waiting-code"></b><div class="waiting-list" id="waiting-list"></div><button class="secondary exit">Odadan ayrıl</button></dialog>');
 // Connection status must reflect the socket regardless of whether the 3D scene can start,
 // so a WebGL failure never leaves the header stuck on "Bağlanıyor" with no explanation.
-socket.on('connect',()=>{$('connection').innerHTML='<i></i> Çevrimiçi';});
+socket.on('connect',()=>{$('connection').innerHTML='<i></i> Çevrimiçi';refreshRooms();});
 socket.on('connect_error',error=>{$('connection').textContent='Sunucuya bağlanılamadı';console.error('socket connect_error:',error.message);});
 try{world=createScene($('scene'));}catch(error){$('fatal').classList.remove('hidden');$('fatal').textContent='3D oda açılamadı. WebGL destekli güncel bir tarayıcıda donanım hızlandırmasını açıp tekrar dene.';console.error('createScene failed:',error);throw error;}
 const defaults={mapId:'loft',mapRotate:true,teamSize:3,botMode:'fill',hunterBots:3,hiderBots:2,hideSeconds:20,roundSeconds:180,teamSelection:'choose',swapTeams:true,objectCount:10,decor:.25,idleReveal:30,smashHits:50,revealHits:3,escapeBoost:1.1};
@@ -107,6 +108,15 @@ function ensureSkinGrid(){
  paintSkinGrid();
 }
 const mapName=id=>MAP_CHOICES.find(m=>m.id===id)?.name||id;
+const phaseName=phase=>phase==='play'?'Tur oynanıyor':phase==='prep'?'Saklanma süresi':phase==='end'?'Tur tamamlandı':'Oyuncular bekleniyor';
+async function refreshRooms(){
+ if(!$('home')||$('home').classList.contains('hidden'))return;
+ try{const response=await fetch('/api/rooms',{cache:'no-store'});if(!response.ok)throw new Error();const rooms=await response.json();
+  if(!rooms.length){const empty=document.createElement('small');empty.textContent='Şu an katılabileceğin açık oda yok.';$('active-rooms').replaceChildren(empty);return;}
+  $('active-rooms').replaceChildren(...rooms.map(room=>{const row=document.createElement('div'),code=document.createElement('b'),detail=document.createElement('span'),join=document.createElement('button');row.className='room-row';code.textContent=room.code;detail.textContent=`${mapName(room.mapId)} · ${room.players}/${room.capacity} · ${phaseName(room.phase)}${room.waiting?` · ${room.waiting} sırada`:''}`;join.textContent=room.phase==='play'||room.phase==='prep'?'Sıraya gir →':'Katıl →';join.onclick=()=>{$('code').value=room.code;openPlay('join');};row.append(code,detail,join);return row;}));
+ }catch{const error=document.createElement('small');error.textContent='Oda listesi şu an yenilenemedi.';$('active-rooms').replaceChildren(error);}
+}
+$('rooms-refresh').onclick=refreshRooms;setInterval(refreshRooms,4000);
 for(let i=1;i<=12;i++){const o=document.createElement('option');o.value=i;o.textContent=`${i} kişi · ${i}'e ${i}`;$('team-size').append(o);}
 // Ayar ekranı iki yerde ikiye katlanmış seçeneklerle şişmişti. Aynı şeyi anlatanlar tek dile
 // indirildi: "eşya yoğunluğu" hem süs eşyasını hem ek eşya sayısını, "hazır ayar" ise avcı-saklanan
@@ -203,6 +213,8 @@ socket.on('disconnect',()=>{$('connection').textContent='Bağlantı kesildi';if(
 socket.on('hit',r=>{$('hit-feedback').textContent=r.found?'✦ BULDUN!':r.decoy?'◇ KOPYA DAĞILDI':r.smashed?'◈ EŞYA DAĞILDI':r.real&&r.smashAt?`💧 Gerçek eşya · ${r.shots}/${r.smashAt}`:`💧 %${Math.round(r.wet)}${r.real?' · Gerçek eşya':''}`;clearTimeout(hitTimer);hitTimer=setTimeout(()=>$('hit-feedback').textContent='',900);if(r.found)audio.effect('found',.15);});
 function renderResult(s){$('winner').textContent=s.winner==='hunter'?'Avcılar kazandı!':'Saklananlar kazandı!';$('result-text').textContent=s.reason||'';$('again').disabled=s.host!==myId;$('result-roster').replaceChildren(...s.players.filter(p=>p.team==='hider').map(p=>{const d=document.createElement('div'),name=document.createElement('span'),status=document.createElement('small');name.textContent=p.name;status.textContent=p.status==='found'?'BULUNDU':'SAKLI KALDI';d.append(name,status);return d;}));}
 socket.on('state',s=>{if(!myId)return;state=s;const p=me();if(!p)return;if(s.round!==lastRound&&['brief','prep'].includes(s.phase)){lastRound=s.round;spectatorMode='free';spectatorTarget=null;entered=false;yaw=p.yaw||0;pitch=0;stopInput();pickerHush='';pickerAuto=false;pickerSignature='';$('picker').classList.add('hidden');}
+ if(s.phase==='waiting'){lastPhase='waiting';setScreen('home');$('waiting-note').textContent=`${mapName(s.settings.mapId)} haritasındaki ${phaseName(s.currentPhase).toLocaleLowerCase('tr')}. Oda kurucusu yeni turu başlatınca otomatik katılacaksın.`;$('waiting-code').textContent=s.code;$('waiting-list').textContent=s.players.length>1?`Seninle birlikte ${s.players.length} kişi sonraki turu bekliyor.`:'Sırada şu an yalnızca sen varsın.';if(!$('waiting-dialog').open)$('waiting-dialog').showModal();return;}
+ if($('waiting-dialog').open)$('waiting-dialog').close();
  if(s.phase!==lastPhase){lastPhase=s.phase;if(s.phase==='end'){closeDialogs();releaseMouse();renderResult(s);const code=s.code,round=s.round;setTimeout(()=>{if(state?.code===code&&state.round===round&&state.phase==='end')setScreen('result');},1500);}else setScreen(s.phase==='lobby'?'lobby':'hud');}
  if(s.phase==='lobby')renderLobby(s);world.sync(s,myId);if(!active)return;
  const seconds=Math.max(0,Math.ceil((s.until-s.now)/1000));$('timer').textContent=s.phase==='brief'?'HAZIR':`${Math.floor(seconds/60).toString().padStart(2,'0')}:${(seconds%60).toString().padStart(2,'0')}`;

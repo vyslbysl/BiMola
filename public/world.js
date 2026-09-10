@@ -63,6 +63,13 @@ export function mapFor(objectsOrId){
  mapMemo.set(objectsOrId,map);return map;
 }
 export const groundAt=(x,z,objectsOrId)=>{const map=mapFor(objectsOrId);return map.raised?terrainHeight(map,x,z):0;};
+// Halı gibi ince zemin parçaları katı duvar değildir; yine de küçük bir kılığın altına gömülmesine
+// izin verilmez. Taşınan nesnenin gerçek taban alanıyla kesişen en yüksek örtüyü döndürür.
+export function floorCoverHeight(x,z,objects=fixtures,ignoreId=null,shape=null){
+ let floor=groundAt(x,z,objects),mover=shape?{...shape,x,z}:null,size=mover?dimensions(mover):null;
+ for(const o of objects){const t=propTypes[o.type];if(o.id===ignoreId||!t?.flat)continue;const hit=mover?overlapSized(mover,size,o,dimensions(o)):contains(o,x,z,0);if(hit)floor=Math.max(floor,(o.y||0)+t.height);}
+ return floor;
+}
 const wallCache=new Map(),terrainCache=new Map();
 export function wallBoxes(objectsOrId){const map=mapFor(objectsOrId);if(wallCache.has(map.id))return wallCache.get(map.id);const boxes=map.walls.map(([x,z,w,d,h=map.room.height,y=0,material])=>({x,z,w,d,h,y,material}));wallCache.set(map.id,boxes);return boxes;}
 export function terrainBoxes(objectsOrId){const map=mapFor(objectsOrId);if(!map.raised)return [];if(terrainCache.has(map.id))return terrainCache.get(map.id);const out=[{x:0,z:-13.5,w:28,d:9,h:3,y:0}];for(const x of [-10.9,10.9])for(let i=0;i<56;i++)out.push({x,z:4.875-i*.25,w:3.8,d:.25,h:(i+1)*3/56,y:0});terrainCache.set(map.id,out);return out;}

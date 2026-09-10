@@ -256,7 +256,13 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  // (teal) her karakterde bir aksesuar olarak durur, böylece avcı uzaktan hâlâ avcı gibi okunur.
  const skinStyles=new Map();
  const styleFor=id=>{const key=skinFor(id);if(!skinStyles.has(key))skinStyles.set(key,buildSkin(mapContext,key,new THREE.Group())||{});return skinStyles.get(key);};
- const people=new Map();function avatar(team,skinId=DEFAULT_SKIN){
+ function nameTag(value){
+  const name=String(value||'').trim().slice(0,18);if(!name)return null;
+  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;const c=canvas.getContext('2d');c.font='700 52px Manrope, Arial, sans-serif';const width=Math.min(470,Math.ceil(c.measureText(name).width+68));
+  c.fillStyle='#1e332ee8';c.beginPath();c.roundRect((512-width)/2,18,width,82,22);c.fill();c.strokeStyle='#ffffffcc';c.lineWidth=4;c.stroke();c.fillStyle='#fffdf4';c.textAlign='center';c.textBaseline='middle';c.fillText(name,256,59,width-40);
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.minFilter=THREE.LinearFilter;const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:true,depthWrite:false}));sprite.position.set(0,2.08,0);sprite.scale.set(1.65,.41,1);sprite.renderOrder=4;return sprite;
+ }
+ const people=new Map();function avatar(team,skinId=DEFAULT_SKIN,displayName=''){
   const g=new THREE.Group(),skin=mat('#c59776');
   const style=team==='hunter'?buildSkin(mapContext,skinFor(skinId),g)||{}:{};
   const shirt=style.shirt||(team==='hunter'?m.teal:m.terracotta),pants=style.pants||m.navy;
@@ -277,7 +283,7 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   if(team==='hunter'){const pivot=new THREE.Group();pivot.position.y=EYE_HEIGHT;const held=gun.clone(true);held.visible=true;held.position.set(GUN_POSITION.x,GUN_POSITION.y,GUN_POSITION.z);held.rotation.set(0,0,0);held.children.filter(c=>c.userData.firstPersonOnly).forEach(c=>held.remove(c));pivot.add(held);for(const side of [-1,1]){const shoulder=[side*.245,1.33-EYE_HEIGHT,0],elbow=[side*.30,1.03-EYE_HEIGHT,-.21],hand=side===1?[GUN_POSITION.x+.025,GUN_POSITION.y-.15,GUN_POSITION.z+.12]:[GUN_POSITION.x-.08,GUN_POSITION.y-.04,GUN_POSITION.z-.08];rod(shoulder,elbow,.064,shirt,pivot);sphere(.056,...elbow,skin,pivot);rod(elbow,hand,.048,skin,pivot);sphere(.052,...hand,skin,pivot);}g.add(pivot);g.userData.weaponPivot=pivot;}
   // Sahneye eklemek çağırana bırakılır: aynı kurucu, seçim ekranının önizleme karesi için de
   // sahne dışında bir figür üretebiliyor.
-  g.userData.limbs=limbs;g.userData.team=team;g.userData.skin=team==='hunter'?skinFor(skinId):null;contact(0,0,.75,.6,g);return g;
+  const label=nameTag(displayName);if(label)g.add(label);g.userData.limbs=limbs;g.userData.team=team;g.userData.skin=team==='hunter'?skinFor(skinId):null;g.userData.playerName=displayName;contact(0,0,.75,.6,g);return g;
  }
  const gun=new THREE.Group();camera.add(gun);gun.position.set(GUN_POSITION.x,GUN_POSITION.y,GUN_POSITION.z);
  const aqua=mat('#63c4c4',{roughness:.3}),navy=mat('#28484a',{roughness:.42}),coral=mat('#f4a252',{roughness:.37}),skin=mat('#d6a482',{roughness:.65});
@@ -314,7 +320,7 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   // Takımlar tur arası yer değiştirdiğinde model yeniden kurulur; seçilen avcı karakteri de aynı
   // karşılaştırmaya girer, yoksa saklananken kurulan gövde avcı olunca eski kalırdı.
   const look=team==='hunter'?skinFor(p.skin):null;
-  if(g&&(g.userData.team!==team||g.userData.skin!==look)){scene.remove(g);people.delete(p.id);g=null;}if(!g){g=avatar(team,p.skin);scene.add(g);g.position.set(p.x,p.y||0,p.z);people.set(p.id,g);}g.userData.target=new THREE.Vector3(p.x,p.y||0,p.z);g.userData.angle=p.yaw||0;g.userData.crouch=!!p.crouch;if(g.userData.weaponPivot)g.userData.weaponPivot.rotation.x=p.pitch||0;g.visible=p.id!==myId;}for(const[id,g]of people)if(!visibleIds.has(id))g.visible=false;for(const shot of state.shots||[])addShot(shot);}
+  if(g&&(g.userData.team!==team||g.userData.skin!==look||g.userData.playerName!==p.name)){scene.remove(g);people.delete(p.id);g=null;}if(!g){g=avatar(team,p.skin,p.name);scene.add(g);g.position.set(p.x,p.y||0,p.z);people.set(p.id,g);}g.userData.target=new THREE.Vector3(p.x,p.y||0,p.z);g.userData.angle=p.yaw||0;g.userData.crouch=!!p.crouch;if(g.userData.weaponPivot)g.userData.weaponPivot.rotation.x=p.pitch||0;g.visible=p.id!==myId;}for(const[id,g]of people)if(!visibleIds.has(id))g.visible=false;for(const shot of state.shots||[])addShot(shot);}
  const tempVec=new THREE.Vector3(),cameraTarget=new THREE.Vector3(),focus=new THREE.Vector3();
  let frameCount=0,frameSum=0,frameTicks=0;
  // Kamera ile kılık arasında kalan duvar, tavan paneli veya mobilya o kare boyunca gizlenir:

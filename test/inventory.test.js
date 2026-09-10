@@ -83,3 +83,12 @@ test('raising a plate under a table cannot hop through the tabletop',()=>{
  Object.assign(p,{propId:'plate',x:0,z:7,y:.5,input:{lift:1},grounded:false});
  for(let i=0;i<40;i++){p.inputAt=1000+i*25;tick(r,p.inputAt,.025);assert.ok(p.y<.75,'plate must stay below the solid tabletop');}
 });
+test('a small plate rides over rugs and cannot tunnel through a wall',()=>{
+ const r=room(),p=r.players.b,plate={id:'plate',type:'plate',mapId:'loft',x:-8,z:5,y:0,angle:0,owner:p.id};
+ r.objects=[{id:'rug',type:'rugLiving',mapId:'loft',x:-8,z:5,y:.005,angle:0},plate];Object.assign(p,{propId:plate.id,x:plate.x,z:plate.z,y:0,input:{x:1},inputAt:1000,grounded:true});
+ tick(r,1000,.1);assert.ok(p.y>=.023,'tabak halının üstünde kalır');
+ delete plate.owner;p.propId=null;plate.y=0;settleObjects(r,.025);assert.ok(plate.y>=.023,'sahipsiz tabak da halının altına gömülü kalmaz');
+ Object.assign(plate,{x:-2.7,z:4,y:0,owner:p.id});Object.assign(p,{propId:plate.id,x:-2.7,z:4,y:0,input:{x:1},inputAt:2000});
+ for(let i=0;i<20;i++){p.inputAt=2000+i*100;tick(r,p.inputAt,.1);}
+ assert.ok(p.x<-2.5,'tabak iç duvarı geçemez');
+});
