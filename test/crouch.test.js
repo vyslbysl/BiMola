@@ -77,6 +77,24 @@ test('eğilme basılı tutuldukça sürer, yalnızca avcıya işler ve bayat gir
  assert.equal(p.crouch,false);
 });
 
+test('avcı da zıplar: yüksek rafın üstünü görecek kadar yükselir',()=>{
+ const {r,h}=room(6);
+ // Açık zemin: tavan ya da mobilya zıplamayı kesmesin.
+ h.x=0;h.z=-5;h.y=0;h.vy=0;h.grounded=true;
+ let apex=0;
+ for(let i=0;i<200;i++){
+  const t=20000+i*25;h.input={jump:true};h.inputAt=t;tick(r,t,.025);
+  apex=Math.max(apex,h.y);
+  if(i>4&&h.grounded&&h.y<=.001)break;
+ }
+ // Teorik tepe JUMP_SPEED^2/(2*GRAVITY)=1.21 m; 25 ms'lik adımlarla biraz altında örneklenir.
+ assert.ok(apex>1,`avcı yerden kalkmıyor: tepe ${apex.toFixed(3)} m`);
+ // Zıplamanın amacı bu: göz hizası kitaplığın (2.60 m) üstünü görecek kadar yükselsin.
+ assert.ok(EYE_HEIGHT+apex>2.6,`tepede göz hizası ${(EYE_HEIGHT+apex).toFixed(2)} m`);
+ assert.equal(h.grounded,true,'sonunda yere iner');
+ assert.ok(Math.abs(h.y)<.01,'ve zemine oturur');
+});
+
 test('eğilen avcı yavaşlar ve zıplayamaz',()=>{
  const walk=crouch=>{
   const {r,h}=room(6);

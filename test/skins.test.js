@@ -21,13 +21,15 @@ function context(){
   cyl:(rt,rb,h,x,y,z,mat,parent)=>add('cyl',Math.max(rt,rb)*2,h,Math.max(rt,rb)*2,x,y,z,mat,parent),
   sphere:(r,x,y,z,mat,parent,sx=1,sy=1,sz=1)=>add('sphere',r*2*sx,r*2*sy,r*2*sz,x,y,z,mat,parent),
   torus:(r,t,x,y,z,mat,parent)=>add('torus',(r+t)*2,t*2,(r+t)*2,x,y,z,mat,parent),
+  // rod iki nokta arasına uzanır: kutusu kalınlığı kadar geniş, uzunluğu kadar yüksek sayılır.
+  rod:(a,b,r,mat,parent)=>add('rod',r*2,Math.hypot(b[0]-a[0],b[1]-a[1],b[2]-a[2]),r*2,(a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2,mat,parent),
  };
 }
 const built=id=>{const c=context();return {style:buildSkin(c,id,c.g),parts:c.parts};};
 
-test('katalog üç karakteri ad ve kıyafet tarifiyle tanımlar; sunucu tanımadığı adı kabul etmez',()=>{
- assert.equal(SKINS.length,3);
- assert.equal(new Set(SKINS.map(s=>s.id)).size,3);
+test('katalog dört karakteri ad ve kıyafet tarifiyle tanımlar; sunucu tanımadığı adı kabul etmez',()=>{
+ assert.equal(SKINS.length,4);
+ assert.equal(new Set(SKINS.map(s=>s.id)).size,4);
  for(const entry of SKINS){assert.match(entry.id,/^[a-z]+$/);assert.ok(entry.name.trim().length,entry.id);assert.ok(entry.note.trim().length,entry.id);assert.ok(validSkin(entry.id));}
  assert.ok(validSkin(DEFAULT_SKIN));
  // skinFor'un sonucu doğrudan oyuncu durumuna yazılıyor: uydurma ad da, prototip adı da geçmez.
@@ -55,7 +57,7 @@ test('her karakter insan ölçeğinde sonlu geometri kurar, tanınmayan ad hiç 
  assert.equal(unknown.parts.length,0);
 });
 
-test('üç karakter birbirinden gerçekten ayrılır ve hepsi takım rengini taşır',()=>{
+test('dört karakter birbirinden gerçekten ayrılır ve hepsi takım rengini taşır',()=>{
  const signatures=SKINS.map(entry=>{
   const {parts}=built(entry.id);
   // Takım rengi (teal) her karakterde bir aksesuar olarak durur: avcı uzaktan avcı gibi okunsun.
@@ -65,7 +67,7 @@ test('üç karakter birbirinden gerçekten ayrılır ve hepsi takım rengini ta�
  assert.equal(new Set(signatures).size,SKINS.length,'iki karakter aynı kıyafeti çizmemeli');
 });
 
-test('kıyafet katmanı yüz bölgesine hiç dokunmaz: baş ve yüz üç karakterde de aynı kalır',()=>{
+test('kıyafet katmanı yüz bölgesine hiç dokunmaz: baş ve yüz dört karakterde de aynı kalır',()=>{
  // avatar() gözleri 1.63 m'de, burnu 1.586 m'de, ağzı 1.55 m'de çizer ve bunları hiçbir karakter
  // için değiştirmez. Ayrım giyimden gelsin diye yüzün önü kıyafet katmanına kapalıdır; çeneyi
  // saran sakal 1.56 m'nin altında kalır. Buraya bir parça eklenirse bu test bilinçli düşmeli.

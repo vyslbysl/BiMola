@@ -4,6 +4,7 @@ import {buildMapProp,buildMapArchitecture} from './map-models.js';
 import * as THREE from '/vendor/three.module.js';
 import {moveSpectator} from './spectator.js';
 import {buildSkin,skinFor,DEFAULT_SKIN} from './skins.js';
+import {effectFade} from './effects.js';
 import {installHiggsfieldMaterials} from './materials.js';
 import {mapFor,wallBoxes,terrainBoxes,ROOM,walls,props as initialProps,propTypes,dimensions,objectDistance,hitParts} from './world.js';
 
@@ -336,12 +337,19 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
  const revealEffects=[],seenEffects=new Set(),reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
  const shardGeometry=new THREE.OctahedronGeometry(.07),ringGeometry=new THREE.TorusGeometry(.6,.025,6,48);
  const beamGeometry=new THREE.CylinderGeometry(.055,.19,1.7,10,1,true);
+ const dropGeometry=new THREE.SphereGeometry(.085,10,8);
  function addEffect(effect,age=0){
   if(seenEffects.has(effect.id))return;seenEffects.add(effect.id);if(seenEffects.size>256)seenEffects.delete(seenEffects.values().next().value);
-  if(age>1500)return;
+  if(age>effectFade(effect.kind))return;
   const g=new THREE.Group();g.position.set(effect.x,effect.y||0,effect.z);scene.add(g);
   const idle=effect.kind==='idle';
   const material=new THREE.MeshStandardMaterial({color:effect.kind==='decoy'?'#a8ddd8':effect.kind==='smash'?'#c58a5c':idle?'#efb851':'#60cce6',transparent:true,opacity:idle?.62:.9,roughness:.23,metalness:.15,side:idle?THREE.DoubleSide:THREE.FrontSide});
+  // Damla bir patlama değil, yerde kalan küçük bir su birikintisi: halka, kıymık, sütun yok.
+  if(effect.kind==='drip'){
+   const drop=new THREE.Mesh(dropGeometry,material);drop.position.y=.03;drop.scale.set(1,.3,1);g.add(drop);
+   revealEffects.push({g,ring:drop,pieces:[],material,silhouette:null,drip:true,life:effectFade('drip')/1000,start:performance.now()-Math.max(0,age)});
+   return;
+  }
   const ring=new THREE.Mesh(ringGeometry,material);ring.rotation.x=-Math.PI/2;ring.position.y=.08;g.add(ring);
   const pieces=[];
   // İz bir patlama değil, bir işaret: kıymık saçmaz, yerinde nefes alan bir sütun bırakır.
@@ -356,7 +364,11 @@ for(const [x,z,w,d] of walls){const g=shellPiece();if(x===14){box(.3,.58,36,14,.
   revealEffects.push({g,ring,pieces,material,silhouette,spread:idle?.65:reducedMotion?.5:2.2,start:performance.now()-Math.max(0,age)});
  }
  function clearEffect(fx){scene.remove(fx.g);fx.material.dispose();fx.silhouette?.children.forEach(o=>o.geometry.dispose());}
- function animateEffects(now){for(let i=revealEffects.length-1;i>=0;i--){const fx=revealEffects[i],age=(now-fx.start)/1000;if(age>=1.5){clearEffect(fx);revealEffects.splice(i,1);continue;}const k=age/1.5;fx.material.opacity=.9*(1-k);fx.ring.scale.setScalar(1+age*(fx.spread??(reducedMotion?.5:2.2)));for(const piece of fx.pieces){piece.position.copy(piece.userData.start).addScaledVector(piece.userData.velocity,reducedMotion?age*.15:age);piece.position.y=Math.max(.05,piece.position.y-age*age*1.8);piece.rotation.set(age*3,age*2,age);piece.scale.multiplyScalar(.994);}if(fx.silhouette){fx.silhouette.position.y=age*.25;fx.silhouette.scale.setScalar(1+Math.sin(Math.min(1,age*3)*Math.PI)*.12);}}}
+ function animateEffects(now){for(let i=revealEffects.length-1;i>=0;i--){const fx=revealEffects[i],age=(now-fx.start)/1000,life=fx.life??1.5;if(age>=life){clearEffect(fx);revealEffects.splice(i,1);continue;}const k=age/life;
+  // Damla önce hızlıca yayılır, sonra yavaşça solar: iz birden kaybolmaz, silinir. Böylece
+  // avcı damlanın tazeliğinden hangi yöne gidildiğini okuyabiliyor.
+  if(fx.drip){fx.material.opacity=.8*(1-k*k);const grow=1+Math.min(1,age*4)*.55;fx.ring.scale.set(grow,.3,grow);continue;}
+  fx.material.opacity=.9*(1-k);fx.ring.scale.setScalar(1+age*(fx.spread??(reducedMotion?.5:2.2)));for(const piece of fx.pieces){piece.position.copy(piece.userData.start).addScaledVector(piece.userData.velocity,reducedMotion?age*.15:age);piece.position.y=Math.max(.05,piece.position.y-age*age*1.8);piece.rotation.set(age*3,age*2,age);piece.scale.multiplyScalar(.994);}if(fx.silhouette){fx.silhouette.position.y=age*.25;fx.silhouette.scale.setScalar(1+Math.sin(Math.min(1,age*3)*Math.PI)*.12);}}}
  function sync(state,myId){currentState=state;currentId=myId;if(!state)return;useMap(state.settings?.mapId||'loft');for(const effect of state.effects||[])addEffect(effect,state.now-effect.at);updateObjects(state.objects?.length?state.objects:mapFor(state.settings?.mapId||'loft').fixtures);const visibleIds=new Set();for(const p of state.players||[]){const team=p.role||p.team;if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||p.status==='found'||p.propId)continue;visibleIds.add(p.id);let g=people.get(p.id);
   // Takımlar tur arası yer değiştirdiğinde model yeniden kurulur; seçilen avcı karakteri de aynı
   // karşılaştırmaya girer, yoksa saklananken kurulan gövde avcı olunca eski kalırdı.

@@ -110,7 +110,17 @@ export const CROUCH_BODY_HEIGHT=1.1;
 // What is underfoot at this spot: the tallest thing short enough to climb. Furniture counts, and so
 // do the broader props — a pouf, a suitcase, a laundry basket or the log table are all wide enough
 // to perch on, while a mug or a stack of books is not.
-export function dimensions(o){const t=propTypes[o.type];return {w:t.w||t.radius*2,d:t.d||t.radius*2,h:t.height,under:t.under||0};}
+// Ölçüler yalnızca tipe bağlı ve propTypes çalışma zamanında değişmiyor, o yüzden tip başına bir
+// kez kurulur. Her çağrıda yeni nesne üretmek çarpışma ve ışın yolunda tur başına milyonlarca
+// gereksiz ayırma çıkarıyordu; sonuç hiçbir çağıran tarafından değiştirilmiyor, yalnızca okunuyor.
+// Her iki önbellek de burada durur: props=generateProps() modül kurulurken free()'yi çağırıyor,
+// yani hitParts dosyanın altında tanımlansa da önbelleği o noktadan önce hazır olmalı.
+const dimensionCache=new Map(),partCache=new Map();
+export function dimensions(o){
+ let d=dimensionCache.get(o.type);
+ if(!d){const t=propTypes[o.type];d={w:t.w||t.radius*2,d:t.d||t.radius*2,h:t.height,under:t.under||0};dimensionCache.set(o.type,d);}
+ return d;
+}
 export function localPoint(o,x,z){const a=o.angle||0,c=Math.cos(a),s=Math.sin(a),dx=x-o.x,dz=z-o.z;return {x:dx*c-dz*s,z:dx*s+dz*c};}
 export function contains(o,x,z,pad=0){const p=localPoint(o,x,z),d=dimensions(o);return Math.abs(p.x)<d.w/2+pad&&Math.abs(p.z)<d.d/2+pad;}
 export function objectDistance(p,o){const q=localPoint(o,p.x,p.z),d=dimensions(o);return Math.hypot(Math.max(0,Math.abs(q.x)-d.w/2),Math.max(0,Math.abs(q.z)-d.d/2));}
@@ -205,6 +215,11 @@ export function free(x,z,radius=.28,objects=fixtures,ignoreId=null,y=0,height=BO
   if(o.id===ignoreId||o.decoyOf===ignoreId||ignoreIds.has(o.id))return false;
   const t=propTypes[o.type];if(!t||t.flat)return false;
   const base=o.y||0;if(base+t.height<=clear||base>=top-.025)return false;
+  // Yatay erim reddi: parçalar nesnenin ayak izinden taşmıyor, dönme de en fazla hypot(w,d)/2
+  // yarıçapına ulaşıyor. Bu kadar uzaktaki bir nesne hiçbir parçasıyla değemez, parça döngüsüne
+  // hiç girmeden elenir. 5 cm pay güvenlik için.
+  const od=dimensions(o),reach=Math.hypot(od.w,od.d)/2+.05;
+  if(Math.abs(x-o.x)>ex+reach||Math.abs(z-o.z)>ez+reach)return false;
   return hitParts(o).some(part=>{
    if(base+part.y+part.h<=clear||base+part.y>=top-.025)return false;
    const a=o.angle||0,c=Math.cos(a),s=Math.sin(a),solid={x:o.x+c*part.x+s*part.z,z:o.z-s*part.x+c*part.z,angle:a};
@@ -228,9 +243,28 @@ export function sight(a,b,objects){
  return true;
 }
 export function rayBox(origin,direction,bounds){let lo=0,hi=30;for(const axis of ['x','y','z']){const d=direction[axis],v=origin[axis];if(Math.abs(d)<1e-8){if(v<bounds.min[axis]||v>bounds.max[axis])return null;}else{let a=(bounds.min[axis]-v)/d,b=(bounds.max[axis]-v)/d;if(a>b)[a,b]=[b,a];lo=Math.max(lo,a);hi=Math.min(hi,b);if(lo>hi)return null;}}return lo;}
-export function nearestHit(origin,direction,objects,players=[]){let hit={distance:28,kind:'miss',point:{x:origin.x+direction.x*28,y:origin.y+direction.y*28,z:origin.z+direction.z*28}};function check(bounds,kind,id){const d=rayBox(origin,direction,bounds);if(d!==null&&d<hit.distance)hit={distance:d,kind,id,point:{x:origin.x+direction.x*d,y:origin.y+direction.y*d,z:origin.z+direction.z*d}};}
- for(const {x,z,w,d,h,y} of [...wallBoxes(objects),...terrainBoxes(objects)])check({min:{x:x-w/2,y,z:z-d/2},max:{x:x+w/2,y:y+h,z:z+d/2}},'wall');
+// `ignoreId` verilirse o nesne atlanır. Çağıranın diziyi filtreleyip kopyalaması gerekmesin diye
+// var: reachable() her aday için 300+ elemanlık yeni dizi üretiyordu.
+export function nearestHit(origin,direction,objects,players=[],ignoreId=null){let hit={distance:28,kind:'miss',point:{x:origin.x+direction.x*28,y:origin.y+direction.y*28,z:origin.z+direction.z*28}};function check(bounds,kind,id){const d=rayBox(origin,direction,bounds);if(d!==null&&d<hit.distance)hit={distance:d,kind,id,point:{x:origin.x+direction.x*d,y:origin.y+direction.y*d,z:origin.z+direction.z*d}};}
+ // Duvar ve zemin kutuları önbellekli diziler; birleştirip kopyalamak her çağrıda boşa ayırmaydı.
+ const walls=wallBoxes(objects),terrain=terrainBoxes(objects);
+ for(let i=0;i<walls.length;i++){const {x,z,w,d,h,y}=walls[i];check({min:{x:x-w/2,y,z:z-d/2},max:{x:x+w/2,y:y+h,z:z+d/2}},'wall');}
+ for(let i=0;i<terrain.length;i++){const {x,z,w,d,h,y}=terrain[i];check({min:{x:x-w/2,y,z:z-d/2},max:{x:x+w/2,y:y+h,z:z+d/2}},'wall');}
+ // Sınır küresi reddi. Yalnızca "daha yakın bir isabet üretemeyecek" nesneleri eler, o yüzden
+ // sonucu değiştiremez: mesafe karşılaştırması katı küçüktür, eşitlikte yine ilk bulunan kazanır.
+ // Işın birim değilse (hiçbir çağıran öyle vermiyor ama) eleme kapanır ve tam yol işler.
+ const unit=Math.abs(direction.x*direction.x+direction.y*direction.y+direction.z*direction.z-1)<1e-6;
  for(const o of objects){
+  if(o.id===ignoreId)continue;
+  if(unit){
+   const b=dimensions(o),base=o.y||0;
+   // 25 cm pay: birkaç parça bildirilen yüksekliği milimetrik aşabiliyor.
+   const reach=Math.hypot(Math.hypot(b.w,b.d)/2,b.h/2)+.25;
+   const cx=o.x-origin.x,cy=base+b.h/2-origin.y,cz=o.z-origin.z;
+   const along=cx*direction.x+cy*direction.y+cz*direction.z;
+   if(along+reach<0||along-reach>hit.distance)continue;
+   if(cx*cx+cy*cy+cz*cz-along*along>reach*reach)continue;
+  }
   const size=dimensions(o),p=localPoint(o,origin.x,origin.z),a=o.angle||0,c=Math.cos(a),s=Math.sin(a);
   const localOrigin={x:p.x,y:origin.y-(o.y||0),z:p.z},localDirection={x:direction.x*c-direction.z*s,y:direction.y,z:direction.x*s+direction.z*c};
   for(const part of hitParts(o)){const d=rayBox(localOrigin,localDirection,{min:{x:part.x-part.w/2,y:part.y,z:part.z-part.d/2},max:{x:part.x+part.w/2,y:part.y+part.h,z:part.z+part.d/2}});if(d!==null&&d<hit.distance)hit={distance:d,kind:'object',id:o.id,point:{x:origin.x+direction.x*d,y:origin.y+direction.y*d,z:origin.z+direction.z*d}};}
@@ -248,7 +282,14 @@ export function pathTo(from,to,objects=fixtures){const map=mapFor(objects),level
   queue.splice(lo,0,[nx,nz]);
  }else queue.push([nx,nz]);}}}if(!end)return[];const result=[];while(end&&(end[0]!==sx||end[1]!==sz)){result.unshift({x:end[0],z:end[1]});end=parent.get(key(...end));}return result;}
 
+// Çarpışma parçaları da yalnızca tipe bağlı. free() her nesne için, nearestHit() her ışın için
+// çağırıyor; her seferinde diziyi yeniden kurmak en sıcak yoldaki tek büyük ayırma kaynağıydı.
 export function hitParts(o){
+ let parts=partCache.get(o.type);
+ if(!parts)partCache.set(o.type,parts=buildParts(o));
+ return parts;
+}
+function buildParts(o){
  const t=propTypes[o.type],d=dimensions(o),f=t.f;
  if(t.model==='chair')return [{x:0,y:.44,z:0,w:.62,h:.08,d:.62},{x:0,y:.6,z:.25,w:.62,h:.38,d:.07},...[-1,1].flatMap(x=>[-1,1].map(z=>({x:x*.28,y:0,z:z*.265,w:.09,h:.44,d:.09})))];
  if(t.model==='stall')return [{x:0,y:.77,z:0,w:d.w,h:.13,d:d.d},{x:0,y:2.55,z:0,w:d.w,h:.25,d:d.d},...[-1,1].flatMap(x=>[-1,1].map(z=>({x:x*1.625,y:0,z:z*.75,w:.07,h:2.7,d:.07}))),{x:0,y:0,z:.8,w:d.w,h:.75,d:.04}];
@@ -264,5 +305,5 @@ export function reachable(p,o,objects){
  const from={x:p.x,y:(p.y||0)+1.3,z:p.z},to={x:o.x+c*lx+s*lz,y:Math.max((o.y||0)+.01,Math.min((o.y||0)+d.h-.01,from.y)),z:o.z-s*lx+c*lz};
  const len=Math.hypot(to.x-from.x,to.y-from.y,to.z-from.z);if(len<.05)return true;
  const direction={x:(to.x-from.x)/len,y:(to.y-from.y)/len,z:(to.z-from.z)/len};
- const hit=nearestHit(from,direction,objects.filter(q=>q.id!==p.propId));return hit.id===o.id||hit.distance>=len-.035;
+ const hit=nearestHit(from,direction,objects,[],p.propId);return hit.id===o.id||hit.distance>=len-.035;
 }
