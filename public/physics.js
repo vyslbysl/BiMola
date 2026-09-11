@@ -33,13 +33,39 @@ export function moveAssembly(room,root,next,{check=true}={}){
 }
 export function detachChildren(objects,root){for(const o of objects)if(o.supportId===root.id){delete o.supportId;o.anchored=false;}}
 export function settleObjects(room,dt){
- for(const o of room.objects){
+ const objects=room.objects;
+ // Kimlik indeksi: desteği aramak için her nesnede diziyi baştan taramak (find) tıklım tıklım bir
+ // odada tur başına yüz binlerce karşılaştırma çıkarıyordu. find ilk eşleşmeyi döndürdüğü için
+ // indeks de ilk göreni tutar.
+ const byId=new Map();
+ for(const o of objects)if(!byId.has(o.id))byId.set(o.id,o);
+ // Kaba konum ızgarası. Destek adayı olmanın şartı contains(other, o.x, o.z): nokta o nesnenin
+ // ayak izinin içinde olmalı. Yani yalnızca o noktayı kapsayan hücredeki nesneler aday olabilir,
+ // geri kalan yüzlerce nesne hiç bakılmadan elenir. Her nesne ayak izi dairesinin değdiği bütün
+ // hücrelere dizi sırasıyla yazılır; eşit yükseklikte iki destek çıkarsa yine ilk gelen kazanır.
+ // x ve z bu fonksiyon boyunca sabittir — moveAssembly yalnızca y taşır, x/z/angle aynen geçilir —
+ // bu yüzden ızgara bir kez kurulup bütün döngü boyunca geçerli kalır.
+ const CELL=3,grid=new Map();
+ for(const other of objects){
+  const t=propTypes[other.type];if(!t||t.flat||t.height<.06)continue;
+  const d=dimensions(other),reach=Math.hypot(d.w,d.d)/2;
+  const cx1=Math.floor((other.x+reach)/CELL),cz1=Math.floor((other.z+reach)/CELL);
+  for(let cx=Math.floor((other.x-reach)/CELL);cx<=cx1;cx++)for(let cz=Math.floor((other.z-reach)/CELL);cz<=cz1;cz++){
+   const k=cx+','+cz,cell=grid.get(k);if(cell)cell.push(other);else grid.set(k,[other]);
+  }
+ }
+ for(const o of objects){
   if(o.owner||o.anchored||o.decoyOf)continue;
-  const parent=room.objects.find(p=>p.id===o.supportId);
-  if(parent)continue;
+  if(byId.get(o.supportId))continue;
   delete o.supportId;
-  let ground=floorCoverHeight(o.x,o.z,room.objects,o.id,o),support=null;
-  for(const other of room.objects){if(other===o||other.supportId===o.id||other.decoyOf===o.id)continue;const t=propTypes[other.type];if(t.flat)continue;const top=(other.y||0)+(t.surface??t.height);if(t.height>=.06&&dimensions(o).w*dimensions(o).d<=dimensions(other).w*dimensions(other).d*1.1&&top<=(o.y||0)+.025&&top>ground&&contains(other,o.x,o.z,-.01)){ground=top;support=other;}}
+  let ground=floorCoverHeight(o.x,o.z,objects,o.id,o),support=null;
+  const self=dimensions(o),area=self.w*self.d;
+  const cell=grid.get(Math.floor(o.x/CELL)+','+Math.floor(o.z/CELL));
+  if(cell)for(const other of cell){
+   if(other===o||other.supportId===o.id||other.decoyOf===o.id)continue;
+   const t=propTypes[other.type],top=(other.y||0)+(t.surface??t.height),od=dimensions(other);
+   if(area<=od.w*od.d*1.1&&top<=(o.y||0)+.025&&top>ground&&contains(other,o.x,o.z,-.01)){ground=top;support=other;}
+  }
   if((o.y||0)>ground+.005){o.fallSpeed=(o.fallSpeed||0)+18*dt;moveAssembly(room,o,{x:o.x,z:o.z,y:Math.max(ground,o.y-o.fallSpeed*dt),angle:o.angle},{check:false});}
   else {o.fallSpeed=0;if((o.y||0)<ground-.002)moveAssembly(room,o,{x:o.x,z:o.z,y:ground,angle:o.angle},{check:false});if(support)o.supportId=support.id;}
  }
