@@ -29,11 +29,11 @@ Her haritanın mimarisi, nesne havuzu ve bot yolları ayrıdır. Eşya değişim
 
 ## Avcı karakteri
 
-Katılma ekranında, taraf seçiminin altında üç hazır karakter vardır: **Levi** (geniş şapka, uzun ceket), **Marco** (beyaz yakalı siyah gömlek) ve **Yusuf** (takke, krem cübbe). Seçim oturum başına bir kezdir, tarayıcıda oyundaki adın yanında saklanır ve bir sonraki girişte hazır gelir. Kart üzerindeki figür ayrı bir vitrin modeli değil, sahnede kullanılan avatarın kendisidir.
+Katılma ekranında, taraf seçiminin altında dört hazır karakter vardır: **Levi** (geniş şapka, uzun ceket), **Marco** (beyaz yaka, pirinç haç kolye), **Yusuf** (takke, krem cübbe) ve **Tenzin** (safran cübbe, tıraşlı baş). Seçim oturum başına bir kezdir, tarayıcıda oyundaki adın yanında saklanır ve bir sonraki girişte hazır gelir. Kart üzerindeki figür ayrı bir vitrin modeli değil, sahnede kullanılan avatarın kendisidir.
 
 Karakter yalnızca **avcı olduğun turlarda** görünür; saklananlar ortak görünümde kalır ve nesneye dönüştüklerinde zaten insan olarak çizilmezler. Takımlar tur arası yer değiştirdiğinde seçim oyuncuda kalır, yeniden seçmen gerekmez. Botlar katalogda sırayla dolaşır, yani dolu bir bot avcı takımı tek karakterin kopyası olmaz.
 
-Üç karakterin baş, yüz ve beden geometrisi birebir aynıdır: ayrım yalnızca kıyafet, başlık ve renklerden gelir, yüz veya beden hatlarından gelmez. Her karakterde takım rengi (teal) bir aksesuar olarak durur — şapka bandı, gömlek düğmeleri, cübbe patı — böylece avcı uzaktan hâlâ avcı gibi okunur. Birinci şahıs görünümünde ekranın altındaki kolluk da seçtiğin karakterin kumaşını alır.
+Dört karakterin baş, yüz ve beden geometrisi birebir aynıdır: ayrım yalnızca kıyafet, başlık ve renklerden gelir, yüz veya beden hatlarından gelmez. Her karakterde takım rengi (teal) bir aksesuar olarak durur — şapka bandı, gömlek düğmeleri, cübbe patı, cübbe bordürü — böylece avcı uzaktan hâlâ avcı gibi okunur. Silüetlerin tepesi de ayrışır: Levi 1,94 m (şapka), Yusuf 1,83 m (takke), Marco 1,77 m (saç), Tenzin 1,76 m (tıraşlı baş). Birinci şahıs görünümünde ekranın altındaki kolluk da seçtiğin karakterin kumaşını alır.
 
 ## Son Sevkiyat — devasa kargo limanı
 
