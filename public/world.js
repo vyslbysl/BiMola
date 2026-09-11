@@ -238,7 +238,15 @@ export function nearestHit(origin,direction,objects,players=[]){let hit={distanc
  for(const p of players){const base=p.y||0,tall=p.crouch?CROUCH_BODY_HEIGHT:BODY_HEIGHT;check({min:{x:p.x-.28,y:base,z:p.z-.28},max:{x:p.x+.28,y:base+tall,z:p.z+.28}},'player',p.id);}
  return hit;
 }
-export function pathTo(from,to,objects=fixtures){const map=mapFor(objects),level=map.raised?(x,z)=>terrainHeight(map,x,z):()=>0,key=(x,z)=>x+','+z,sx=Math.round(from.x),sz=Math.round(from.z),queue=[[sx,sz]],parent=new Map([[key(sx,sz),null]]);let end;for(let i=0;i<queue.length;i++){const [x,z]=queue[i];if(Math.hypot(x-to.x,z-to.z)<1.6&&Math.abs(level(x,z)-level(to.x,to.z))<.35){end=[x,z];break;}for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,nz=z+dz,k=key(nx,nz);if(!parent.has(k)&&Math.abs(level(nx,nz)-level(x,z))<.35&&free(nx,nz,.3,objects,null,level(nx,nz))){parent.set(k,[x,z]);queue.push([nx,nz]);}}}if(!end)return[];const result=[];while(end&&(end[0]!==sx||end[1]!==sz)){result.unshift({x:end[0],z:end[1]});end=parent.get(key(...end));}return result;}
+export function pathTo(from,to,objects=fixtures){const map=mapFor(objects),level=map.raised?(x,z)=>terrainHeight(map,x,z):()=>0,key=(x,z)=>x+','+z,sx=Math.round(from.x),sz=Math.round(from.z),queue=[[sx,sz]],parent=new Map([[key(sx,sz),null]]);let end;for(let i=0;i<queue.length;i++){const [x,z]=queue[i];if(Math.hypot(x-to.x,z-to.z)<1.6&&Math.abs(level(x,z)-level(to.x,to.z))<.35){end=[x,z];break;}for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,nz=z+dz,k=key(nx,nz);if(!parent.has(k)&&Math.abs(level(nx,nz)-level(x,z))<.35&&free(nx,nz,.3,objects,null,level(nx,nz))){parent.set(k,[x,z]);
+ // On expansive maps explore cells nearest the destination first. The frontier
+ // remains exhaustive, so obstacles can still be routed around without scanning
+ // the whole port before each bot takes a step.
+ if(map.room.width>40){
+  const score=Math.abs(nx-to.x)+Math.abs(nz-to.z);let lo=i+1,hi=queue.length;
+  while(lo<hi){const mid=(lo+hi)>>1,q=queue[mid];if(Math.abs(q[0]-to.x)+Math.abs(q[1]-to.z)<=score)lo=mid+1;else hi=mid;}
+  queue.splice(lo,0,[nx,nz]);
+ }else queue.push([nx,nz]);}}}if(!end)return[];const result=[];while(end&&(end[0]!==sx||end[1]!==sz)){result.unshift({x:end[0],z:end[1]});end=parent.get(key(...end));}return result;}
 
 export function hitParts(o){
  const t=propTypes[o.type],d=dimensions(o),f=t.f;

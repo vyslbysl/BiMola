@@ -4,8 +4,8 @@ import {MAPS,MAP_CHOICES,mapTypes} from '../public/maps.js';
 import {generateProps,free,groundAt,mapFor,propTypes,pathTo,nearestHit,sight} from '../public/world.js';
 import {player,start,tick,view,sanitizeSettings,configureRoom,defaultSettings} from '../game.js';
 function make(mapId,teamSize=3){const r={host:'a',phase:'lobby',settings:sanitizeSettings({mapId,teamSize,botMode:'fill',swapTeams:false}),players:{a:player('a','Avcı',false,'hunter')}};assert.equal(start(r,1000).ok,true);return r;}
-test('all six maps are selectable and each new map has its own valid, supported inventory',()=>{
- assert.equal(MAP_CHOICES.length,6);
+test('all eight maps are selectable and each new map has its own valid, supported inventory',()=>{
+ assert.equal(MAP_CHOICES.length,8);
  for(const map of Object.values(MAPS)){
   const objects=generateProps(0,1,map.id),ids=new Set(objects.map(o=>o.id));assert.equal(ids.size,objects.length);
   assert.ok(objects.length>25);
@@ -72,4 +72,59 @@ test('teams swap and so does the venue: the map rotates each round unless the ho
  // Kapatılırsa mekân sabit kalır.
  r.phase='end';assert.ok(configureRoom(r,{mapRotate:false},'a').ok);const pinned=r.settings.mapId;
  for(let i=0;i<6;i++){r.phase='end';start(r,100000+i*1000);assert.equal(r.settings.mapId,pinned,'rotasyon kapalı');}
+});
+
+test('harbor is reduced to two thirds in each horizontal dimension with connected districts and solid outer boundaries',()=>{
+ const map=MAPS.harbor;assert.ok(map,'harbor is registered');
+ assert.equal(map.room.width*map.room.depth,56*72);
+ const objects=generateProps(0,1,'harbor');
+ assert.ok(map.zones.length>=5);assert.ok(objects.length<400,'bounded prop budget');
+ for(const zone of map.zones){
+  const target={x:(zone.xmin+zone.xmax)/2,z:(zone.zmin+zone.zmax)/2};
+  const path=pathTo({x:0,z:0},target,objects);
+  assert.ok(path.length>0,zone.name+' is reachable');
+ }
+ assert.equal(free(28,0,.28,objects),false);
+ assert.equal(free(0,36,.28,objects),false);
+ assert.ok(free(0,32,.28,objects));
+ assert.equal(nearestHit({x:0,y:.6,z:34},{x:0,y:0,z:1},objects).kind,'wall');
+});
+
+test('harbor is an original cargo-port theme, not a collection of old map inventories',()=>{
+ const map=MAPS.harbor;assert.ok(map);assert.equal(MAPS.campus,undefined);
+ assert.ok(map.containers.length>=12);
+ const types=new Set(map.fixtures.map(o=>o.type));
+ for(const type of ['cargoDrum','trafficCone','cableReel','pallet','toolChest','mooringBollard','lifeBuoy','cargoBox'])assert.ok(types.has(type),type);
+ for(const type of types)assert.ok(mapTypes[type]?.harborOnly,type+' belongs to the harbor');
+ for(const zone of map.zones)for(const type of zone.types)assert.ok(mapTypes[type]?.harborOnly);
+});
+
+test('technology office has furnished, reachable departments and clear doorways',()=>{
+ const map=MAPS.techOffice;assert.ok(map,'office registered');
+ assert.deepEqual([map.room.width,map.room.depth],[44,48]);
+ const objects=generateProps(0,1,map.id);
+ const expected={manager:'award',backend:'codeMonitor',mobile:'phoneRack',analyst:'kanbanBoard',database:'storageArray',devops:'networkSwitch',design:'drawingTablet',qa:'testRig'};
+ for(const [id,type]of Object.entries(expected)){
+  const zone=map.zones.find(z=>z.id===id);assert.ok(zone,id);
+  assert.ok(map.fixtures.some(o=>o.type===type&&o.x>zone.xmin&&o.x<zone.xmax&&o.z>zone.zmin&&o.z<zone.zmax),id+' themed props');
+  const target={x:(zone.xmin+zone.xmax)/2,z:(zone.zmin+zone.zmax)/2};
+  assert.ok(pathTo({x:0,z:0},target,objects).length,id+' accessible');
+ }
+ for(const [x,z]of map.doors)assert.ok(free(x,z,.3,objects),`door ${x},${z}`);
+});
+test('resized harbor keeps supported cargo separated at normal prop scale',()=>{
+ const map=MAPS.harbor;
+ assert.deepEqual([map.room.width,map.room.depth],[56,72]);
+ for(const pallet of map.fixtures.filter(o=>o.type==='pallet')){
+  const cargo=map.fixtures.filter(o=>o.supportId===pallet.id);
+  if(cargo.length===2)assert.ok(Math.abs(cargo[0].x-cargo[1].x)>=.62-1e-8);
+ }
+});
+
+test('manager office connects only to the main corridor, with a solid mobile-office divider',()=>{
+ const objects=generateProps(0,1,'techOffice');
+ assert.ok(free(-2.5,-18,.3,objects),'corridor entrance stays open');
+ assert.equal(free(-14,-12,.3,objects),false,'former side doorway is closed');
+ assert.ok(!MAPS.techOffice.doors.some(([x,z])=>x===-14&&z===-12));
+ assert.equal(nearestHit({x:-14,y:1.6,z:-13},{x:0,y:0,z:1},objects).kind,'wall');
 });

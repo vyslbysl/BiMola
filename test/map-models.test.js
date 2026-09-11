@@ -21,5 +21,21 @@ test('every new disguise builds finite 3D geometry within its declared footprint
 });
 test('each environment builds distinct architecture with removable wall groups',()=>{
  const counts=[];for(const map of Object.values(MAPS)){const c=context(),g=buildMapArchitecture(c,map);assert.ok(g.children.length>0);assert.ok(c.pieces.length>=map.walls.length);const bounds=new THREE.Box3().setFromObject(g);assert.ok(Number.isFinite(bounds.max.y));counts.push(g.children.length);}
- assert.equal(new Set(counts).size,5);
+ assert.equal(new Set(counts).size,Object.keys(MAPS).length);
+});
+
+test('harbor ground covers the entire playable area',()=>{
+ assert.ok(MAPS.harbor);
+ const g=buildMapArchitecture(context(),MAPS.harbor);
+ const ground=g.children.find(o=>o.isMesh&&o.position.y<0);
+ const size=new THREE.Box3().setFromObject(ground).getSize(new THREE.Vector3());
+ assert.ok(size.x>=56&&size.x<57&&size.z>=72&&size.z<73);
+});
+
+test('resized harbor wall decoration stays on its physical wall instead of creating floating windows',()=>{
+ const c=context(),map=MAPS.harbor;buildMapArchitecture(c,map);
+ map.walls.forEach(([x,z,w,d],i)=>{
+  const bounds=new THREE.Box3().setFromObject(c.pieces[i]);
+  assert.ok(bounds.min.x>=x-w/2-.1&&bounds.max.x<=x+w/2+.1&&bounds.min.z>=z-d/2-.1&&bounds.max.z<=z+d/2+.1,`wall ${i} at ${x},${z}`);
+ });
 });

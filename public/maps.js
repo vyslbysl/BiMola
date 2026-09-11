@@ -21,6 +21,30 @@ type('luggageCart','Bagaj arabası','luggageCart',1.2,1.8,.8);
 type('parasol','Güneş şemsiyesi','parasol',2.7,2.65,2.7,{under:2.25});
 type('receptionBell','Resepsiyon zili','bell',.18,.13,.18);
 type('exhibitShelf','Sergi kitaplığı','exhibitShelf',2.5,1.8,.65);
+// Cargo-port disguises have their own silhouettes and never enter the older maps.
+type('cargoDrum','Liman varili','cargoDrum',.65,.94,.65,{harborOnly:true});
+type('trafficCone','Trafik konisi','trafficCone',.48,.72,.48,{harborOnly:true});
+type('cableReel','Kablo makarası','cableReel',1.15,.9,1.15,{harborOnly:true,surface:.9});
+type('pallet','Yük paleti','pallet',1.4,.22,1.1,{harborOnly:true,surface:.22});
+type('toolChest','Takım sandığı','toolChest',.85,.65,.5,{harborOnly:true});
+type('mooringBollard','Bağlama babası','mooringBollard',.7,.62,.55,{harborOnly:true});
+type('lifeBuoy','Can simidi','lifeBuoy',.58,.68,.24,{harborOnly:true});
+type('cargoBox','Sevkiyat kolisi','cargoBox',.62,.58,.5,{harborOnly:true});
+// Workstation furniture and role-specific tools for the technology office.
+type('techDesk','Çalışma masası','techDesk',2.6,.78,1.3,{surface:.78,under:.63});
+type('executiveDesk','Yönetici masası','executiveDesk',3.2,.8,1.55,{surface:.8,under:.63});
+type('codeMonitor','Kod ekranı','codeMonitor',1.08,.68,.32);
+type('phoneRack','Telefon test standı','phoneRack',.88,.43,.35);
+type('tabletStand','Tablet standı','tabletStand',.38,.43,.28);
+type('kanbanBoard','İş takip panosu','kanbanBoard',2.2,1.95,.65);
+type('diagramBoard','Sistem şeması','diagramBoard',2.2,1.95,.65);
+type('binderStack','Analiz dosyaları','binderStack',.5,.34,.32);
+type('serverRack','Sunucu kabini','serverRack',.85,2.15,.9);
+type('storageArray','Disk ünitesi','storageArray',.65,.45,.55);
+type('networkSwitch','Ağ anahtarı','networkSwitch',.75,.18,.35);
+type('award','Başarı ödülü','award',.28,.5,.24);
+type('drawingTablet','Çizim tableti','drawingTablet',.72,.12,.48);
+type('testRig','Donanım test seti','testRig',.72,.4,.45);
 const boundary=(h=4.8)=>[[0,-18,28,.3,h],[0,18,28,.3,h],[-14,0,.3,36,h],[14,0,.3,36,h]];
 const area=(id,name,xmin,xmax,zmin,zmax,types)=>({id,name,xmin,xmax,zmin,zmax,types,count:10});
 const maps={};
@@ -42,6 +66,53 @@ const museum=level('museum','Minik Mucitler','Sergiler arasında kaybol, balkond
 const hotel=level('hotel','Bavul Molası','Avluyu geç, bagajların arasına karış.','#65a3a1',[
  ...boundary(6),[-6,-9,.25,12],[6,-9,.25,12],[-6,12,.25,8],[6,12,.25,8],[-10,2,8,.25],[10,2,8,.25]
 ],[area('reception','Resepsiyon',-13,-7,4,16,['case','luggageCart','receptionBell']),area('breakfast','Kahvaltı',7,13,4,16,['mug','plate','stool']),area('lounge','Oturma salonu',-13,-7,-16,0,['pillow','plant','bookstack']),area('luggage','Bagaj odası',7,13,-16,0,['case','luggageCart','basket']),area('courtyard','Avlu',-4,4,-16,16,['plant','diningChair','stool'])],{room:{width:28,depth:36,height:6},doors:[[-6,5,1,3],[6,5,1,3],[-6,-1,1,3],[6,-1,1,3]]});
+// A single working port: container canyons, a freight shed and an open quay.
+const containers=[
+ ...[-43,-31,-19].flatMap((z,row)=>[-31,-12].map((x,col)=>({x,z,w:12,d:3,h:row===0?6.4:3.2,color:(row+col)%3}))),
+ ...[13,27,41].flatMap((z,row)=>[-31,-12].map((x,col)=>({x,z,w:12,d:3,h:row===1?6.4:3.2,color:(row+col+1)%3}))),
+ {x:32,z:8,w:3,d:12,h:3.2,color:1},{x:17,z:35,w:3,d:12,h:3.2,color:2}
+];
+const harbor=level('harbor','Son Sevkiyat','84 × 108 m · Kargo limanı · Konteynerler, vinçler ve rıhtım.','#456e80',[
+ [0,-54,84,.4,5],[0,54,84,.4,1.15],[-42,0,.4,108,5],[42,0,.4,108,1.15],
+ ...containers.map(({x,z,w,d,h})=>[x,z,w,d,h]),
+ // Freight shed: two six-metre loading doors on the south, plus a side exit.
+ [25,-48,30,.35,5.5],[40,-34,.35,28,5.5],[10,-41,.35,14,5.5],[10,-23,.35,6,5.5],
+ [13,-20,6,.35,5.5],[25,-20,6,.35,5.5],[37,-20,6,.35,5.5]
+],[
+ area('stacks','Konteyner sahası',-39,2,-49,-15,['cargoDrum','trafficCone','cableReel','pallet','cargoBox']),
+ area('dispatch','Sevkiyat sahası',-39,2,5,49,['pallet','cargoBox','cargoDrum','toolChest']),
+ area('freight','Gümrük hangarı',12,38,-46,-22,['cargoBox','pallet','toolChest','cableReel']),
+ area('maintenance','Vinç bakım alanı',12,38,-12,18,['toolChest','cargoDrum','trafficCone','cableReel']),
+ area('quay','Rıhtım',12,38,24,50,['mooringBollard','lifeBuoy','cableReel','cargoDrum'])
+],{room:{width:84,depth:108,height:12},preview:'/maps/references/harbor.svg',containers,
+ doors:[[10,-31,2,6],[19,-20,6,2],[31,-20,6,2]]});
+// Eight departments around a five-metre spine; side doors allow a second escape route.
+const officeRooms=[
+ ['manager','Müdür Odası',-1,-18,['award','executiveDesk','binderStack']],
+ ['backend','Backend Developer',1,-18,['codeMonitor','diagramBoard','networkSwitch']],
+ ['mobile','Mobile Developer',-1,-6,['phoneRack','tabletStand','testRig']],
+ ['analyst','İş Analisti',1,-6,['kanbanBoard','binderStack','tabletStand']],
+ ['database','DB Admin',-1,6,['serverRack','storageArray','networkSwitch']],
+ ['devops','DevOps / Altyapı',1,6,['networkSwitch','serverRack','codeMonitor']],
+ ['design','UX / UI Tasarım',-1,18,['drawingTablet','tabletStand','kanbanBoard']],
+ ['qa','QA / Test Ekibi',1,18,['testRig','phoneRack','codeMonitor']]
+];
+const officeWalls=[[0,-24,44,.3],[0,24,44,.3],[-22,0,.3,48],[22,0,.3,48]];
+const officeDoors=[];
+for(const side of [-1,1]){
+ for(const z of [-18,-6,6,18]){
+  officeWalls.push([side*2.5,z-3.8,.25,4.4],[side*2.5,z+3.8,.25,4.4]);
+  officeDoors.push([side*2.5,z,1.2,3.2]);
+ }
+ for(const z of [-12,0,12]){
+  if(side===-1&&z===-12){officeWalls.push([-12.25,z,19.5,.25]);continue;}
+  officeWalls.push([side*7.55,z,10.1,.25],[side*18.7,z,6.6,.25]);
+  officeDoors.push([side*14,z,2.8,1.2]);
+ }
+}
+const techOffice=level('techOffice','Sprint Ofisi','44 × 48 m · 8 ekip odası · Masalar, cihazlar ve sunucular.','#778eac',officeWalls,
+ officeRooms.map(([id,name,side,z,types])=>area(id,name,side<0?-21:3.5,side<0?-3.5:21,z-5.3,z+5.3,types)),
+ {room:{width:44,depth:48,height:4.8},doors:officeDoors,preview:'/maps/references/techOffice.svg'});
 export function terrainHeight(map,x,z){
  if(!map?.raised)return 0;
  if(z<=-9)return 3;
@@ -70,6 +141,62 @@ for(const z of [-12,-6]){add(hotel,'f_sun-sofa',-10,z,0,Math.PI/2);table(hotel,-
 for(const x of [8,10,12])for(const z of [-13,-9,-5])add(hotel,'case',x,z);add(hotel,'luggageCart',8,-1);
 for(const z of [-12,10]){add(hotel,'parasol',0,z);for(const x of [-2,2])add(hotel,'diningChair',x,z);}
 for(const [x,z]of [[-4,-15],[4,-15],[-4,15],[4,15]])add(hotel,'largePlant',x,z);
+// Pallet clusters and loose port equipment are selectable; containers are architecture.
+for(const x of [-35,-25,-15,-5])for(const z of [-48,-36,-24,8,22,36,47]){
+ const p=add(harbor,'pallet',x,z);
+ add(harbor,'cargoBox',x-.3,z,.22,0,p);add(harbor,'cargoBox',x+.32,z,.22,0,p);
+ add(harbor,'cargoDrum',x+2,z+1);
+}
+for(const x of [15,25,35])for(const z of [-43,-27]){
+ const p=add(harbor,'pallet',x,z);add(harbor,'cargoBox',x,z,.22,0,p);
+ add(harbor,'toolChest',x+2,z);add(harbor,'cableReel',x,z+2);
+}
+for(const [x,z]of [[15,-9],[25,-9],[15,12],[25,12],[24,29],[32,43]]){
+ add(harbor,'cableReel',x,z);add(harbor,'toolChest',x+2,z);add(harbor,'cargoDrum',x+3,z+2);
+}
+for(const z of [-8,4,16,28,40,49]){
+ add(harbor,'mooringBollard',39,z);add(harbor,'lifeBuoy',37.5,z);
+}
+for(const z of [-46,-18,8,30,48])for(const x of [4,8])add(harbor,'trafficCone',x,z);
+// Compact the harbor layout while keeping disguises life-sized and cargo aligned on pallets.
+const harborScale=2/3;
+harbor.room.width*=harborScale;harbor.room.depth*=harborScale;harbor.layoutScale=harborScale;
+harbor.subtitle='56 × 72 m · Kargo limanı · Konteynerler, vinçler ve rıhtım.';
+harbor.walls=harbor.walls.map(([x,z,w,d,...rest])=>[x*harborScale,z*harborScale,w*harborScale,d*harborScale,...rest]);
+harbor.doors=harbor.doors.map(v=>v.map(n=>n*harborScale));
+for(const c of harbor.containers)for(const key of ['x','z','w','d'])c[key]*=harborScale;
+for(const zone of harbor.zones)for(const key of ['xmin','xmax','zmin','zmax'])zone[key]*=harborScale;
+const harborPositions=new Map(harbor.fixtures.map(o=>[o.id,{x:o.x,z:o.z}]));
+for(const o of harbor.fixtures){
+ const support=harborPositions.get(o.supportId);
+ o.x=support?support.x*harborScale+(o.x-support.x):o.x*harborScale;
+ o.z=support?support.z*harborScale+(o.z-support.z):o.z*harborScale;
+}
+// Role-specific workstation tops are independent disguises on full-size desks.
+for(const zone of techOffice.zones){
+ const x=(zone.xmin+zone.xmax)/2,z=(zone.zmin+zone.zmax)/2;
+ const workItems={manager:['codeMonitor','award','binderStack'],backend:['codeMonitor','networkSwitch','codeMonitor'],mobile:['phoneRack','tabletStand','testRig'],analyst:['tabletStand','binderStack','binderStack'],database:['codeMonitor','storageArray','networkSwitch'],devops:['codeMonitor','networkSwitch','storageArray'],design:['codeMonitor','drawingTablet','tabletStand'],qa:['codeMonitor','testRig','phoneRack']}[zone.id];
+ const positions=zone.id==='manager'?[[0,-3.2]]:[[-4,-3.2],[4,-3.2],[-4,3.2],[4,3.2]];
+ for(const [dx,dz]of positions){
+  const desk=add(techOffice,zone.id==='manager'?'executiveDesk':'techDesk',x+dx,z+dz);
+  const height=zone.id==='manager'?.8:.78;
+  // One screen at the back, two compact tools along the front edge.
+  add(techOffice,workItems[0],desk.x,desk.z-.32,height,0,desk);
+  add(techOffice,workItems[1],desk.x-.65,desk.z+.35,height,0,desk);
+  add(techOffice,workItems[2],desk.x+.65,desk.z+.35,height,0,desk);
+  add(techOffice,'officeChair',desk.x,desk.z+1.6);
+ }
+ if(zone.id==='manager'){
+  for(const dx of [-1,1])add(techOffice,'diningChair',x+dx,z-1.1,0,Math.PI);
+  table(techOffice,x+5,z+2.5,'f_dining',['binderStack','mug']);
+  add(techOffice,'f_sun-sofa',x-5,z+2.5);
+ }
+ if(['database','devops'].includes(zone.id)){
+  const side=Math.sign(x);for(const dz of [-3.5,-1,1.5,4])add(techOffice,'serverRack',side*20.5,z+dz,0,side<0?Math.PI/2:-Math.PI/2);
+ }
+ add(techOffice,['backend','database','devops'].includes(zone.id)?'diagramBoard':'kanbanBoard',zone.id==='manager'?x-5:x,zone.zmin+1.1);
+ add(techOffice,'plant',x,zone.zmax-1.2);
+}
 // Extra objects on tables remain independently selectable and travel with their support.
 for(const map of Object.values(maps)){for(const f of [...map.fixtures])if(['f_potting','f_dining'].includes(f.type))for(const side of [-1,1])add(map,'stool',f.x+side*1.2,f.z+1.35,terrainHeight(map,f.x,f.z+1.35));}
 export const MAPS=Object.freeze(maps);

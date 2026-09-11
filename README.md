@@ -35,6 +35,31 @@ Karakter yalnızca **avcı olduğun turlarda** görünür; saklananlar ortak gö
 
 Üç karakterin baş, yüz ve beden geometrisi birebir aynıdır: ayrım yalnızca kıyafet, başlık ve renklerden gelir, yüz veya beden hatlarından gelmez. Her karakterde takım rengi (teal) bir aksesuar olarak durur — şapka bandı, gömlek düğmeleri, cübbe patı — böylece avcı uzaktan hâlâ avcı gibi okunur. Birinci şahıs görünümünde ekranın altındaki kolluk da seçtiğin karakterin kumaşını alır.
 
+## Son Sevkiyat — devasa kargo limanı
+
+**Son Sevkiyat**, 56 × 72 metre (4.032 m²) ile standart haritaların **4 katı alan** sunan bağımsız bir kargo limanı konseptidir. Önceki 84 × 108 m sürüme göre en ve boy üçte ikiye indirilmiştir; kılıkların boyutları korunur. Konteyner koridorları, gümrük hangarı, sevkiyat sahası, vinç bakım alanı ve denize açılan rıhtım tek bir endüstriyel mekân oluşturur. Rıhtımın dışındaki vinçler ve yük gemisi manzaradır; denize veya gemiye geçilmez. Konteynerler ve hangar duvarları sabit mimaridir; suyu ve hareketi keser, kılık olarak seçilmez.
+
+Haritaya özel **8 yeni kılık** vardır: liman varili, trafik konisi, kablo makarası, yük paleti, takım sandığı, bağlama babası, can simidi ve sevkiyat kolisi. Paletlerin üzerindeki koliler bağımsız seçilebilir. Diğer haritaların eşya temaları bu haritaya taşınmaz. Harita kartındaki görsel stilize önizlemedir.
+
+Kalabalık gruplar için 6'ya 6 veya 12'ye 12, 60 saniye hazırlık ve 8–10 dakika tur önerilir; süreler otomatik değiştirilmez. Mevcut dönüşüm, kopya, su, bot ve rotasyon kuralları geçerlidir. Bot yol araması geniş haritalarda hedefe yakın hücreleri önce araştırır. Saklanan kamerasının eski sabit X/Z sınırı harita boyutuna göre hesaplanır; küçük haritalardaki kamera mesafesi ve sınır payı korunur.
+
+## Sprint Ofisi — teknoloji şirketi
+
+**44 × 48 metrelik** büyük ofiste beş metrelik ana koridor çevresinde sekiz ekip odası bulunur. Her oda tabelayla işaretlidir. Müdür odasının kapısında **HD** yazar ve bu odanın yalnızca ana koridora girişi vardır; Mobile Developer odasına doğrudan geçiş kapalıdır. Diğer odalarda ana koridor kapısına ek olarak komşu odalar arasında geçiş vardır. Odaların zemin renkleri, çalışma araçları ve yerleşimleri farklıdır.
+
+| Oda | Eşyalar |
+|---|---|
+| Müdür | Tek yönetici masası, başarı ödülü, dosyalar, misafir koltukları, toplantı masası ve kanepe |
+| Backend Developer | Kod ekranları, ağ anahtarları ve sistem şeması |
+| Mobile Developer | Çoklu telefon test standları, tabletler ve donanım test setleri |
+| İş Analisti | Kanban panosu, analiz dosyaları ve tabletler |
+| DB Admin | Sunucu kabinleri, disk üniteleri ve veri akışı şeması |
+| DevOps / Altyapı | Ağ anahtarları, sunucular, kod ekranları ve altyapı şeması |
+| UX / UI Tasarım | Çizim tabletleri, tablet standları, ekranlar ve tasarım panosu |
+| QA / Test | Donanım test setleri, telefon standları, ekranlar ve iş takip panosu |
+
+Ofise özel 14 yeni eşya türü eklenmiştir. Masaların üstündeki araçlar bağımsız kılık olarak seçilir; Q dönüşümü bulunulan odanın eşya havuzuna göre çalışır. Oda tabelaları, tavan aydınlatmaları ve dış pencere panelleri mimaridir. Harita kartında şematik kat planı gösterilir. Önceki kamera düzeltmesi yeni ofis ve küçültülen liman için de geçerlidir.
+
 ## Oda ayarları
 
 Ayar ekranı dört bölüme ayrılır ve aynı şeyi anlatan seçenekler tek dile indirilmiştir: **Mekân**, **Oyuncular**, **Tur akışı**, **Denge**.
