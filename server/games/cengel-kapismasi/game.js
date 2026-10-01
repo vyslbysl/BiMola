@@ -1,6 +1,5 @@
 import {randomInt, randomUUID} from 'node:crypto';
-import {validatePuzzle} from '../../../public/games/cengel-kapismasi/puzzle.js';
-import {starter} from '../../../public/games/cengel-kapismasi/starter.js';
+import {takePuzzle} from './pool.js';
 
 export const MAX_PLAYERS = 12;
 const BOT_ID = 'bot:cengel';
@@ -14,18 +13,34 @@ function syncSoloBot(room) {
   else if (room.phase !== 'play' && count === 1 && !room.players[BOT_ID]) room.players[BOT_ID] = playerState(BOT_ID, 'Mola Botu', undefined, true);
 }
 export function createRoom({code, host}) {
-  return {code, host, phase: 'lobby', players: {}, puzzle: validatePuzzle(starter), revision: 1, filled: {}, completed: {}, feed: [],
-    until: 0, duration: 300, matchId: null, sequence: 0, scoreEvents: [], archives: [], uploads: new Map()};
+  const chosen=takePuzzle(9);
+  return {code, host, phase: 'lobby', players: {}, puzzle: chosen.puzzle, boardSize:9, autoSize:true, recentBoards:[chosen.key], revision: 1, filled: {}, completed: {}, feed: [],
+    until: 0, duration: 300, matchId: null, sequence: 0, scoreEvents: [], archives: []};
 }
 export function addPlayer(room, {id, name, profileId}) {
   room.players[id] = playerState(id, name, profileId);
   syncSoloBot(room);
+  if(room.phase==='lobby' && room.autoSize && humans(room).length>=5 && room.boardSize!==11) resetPuzzle(room,11);
+}
+function resetPuzzle(room,size=room.boardSize) {
+  const chosen=takePuzzle(size,room.recentBoards);
+  room.puzzle=chosen.puzzle; room.boardSize=size;
+  room.recentBoards.push(chosen.key); room.recentBoards=room.recentBoards.slice(-32);
+  room.revision++; room.phase='lobby'; room.filled={}; room.completed={}; room.feed=[]; room.reason='';
+  for(const p of Object.values(room.players)) Object.assign(p,{ready:!!p.isBot,rack:[],spent:[],score:0,correct:0,answered:0,words:0,bonuses:0});
+}
+export function randomize(room,id) {
+  if(id!==room.host)return {error:'Yeni tahtayı oda sahibi seçebilir.'};
+  if(room.phase==='play')return {error:'Maç sürerken tahta değişmez.'};
+  resetPuzzle(room,room.autoSize?(humans(room).length>=5?11:9):room.boardSize);
+  notice(room,'Yeni rastgele tahta hazır. Herkes Hazırım dediğinde başlar.');
+  return {ok:true};
 }
 export function removePlayer(room, id, now = Date.now()) {
   const player = room.players[id];
   if (!player) return;
   if (room.phase === 'play' && player) room.archives.push(player);
-  delete room.players[id]; room.uploads.delete(id);
+  delete room.players[id];
   if (room.host === id) room.host = humans(room)[0]?.id;
   syncSoloBot(room);
   startIfReady(room, now);
@@ -73,6 +88,11 @@ function startIfReady(room, now) {
   const players = Object.values(room.players);
   const members = players.filter(p => !p.isBot);
   if (room.phase === 'play' || !members.length || !members.every(p => p.ready)) return;
+  if(room.phase==='end') {
+    const chosen=takePuzzle(room.autoSize?(members.length>=5?11:9):room.boardSize,room.recentBoards);
+    room.puzzle=chosen.puzzle; room.boardSize=chosen.puzzle.rows;
+    room.recentBoards.push(chosen.key); room.recentBoards=room.recentBoards.slice(-32);
+  }
   room.phase = 'play'; room.revision++; room.until = now + room.duration * 1000; room.matchId = randomUUID(); room.sequence = 0;
   room.filled = {}; room.completed = {}; room.archives = []; room.feed = []; room.reason = '';
   for (const p of players) Object.assign(p, {score: 0, correct: 0, answered: 0, words: 0, bonuses: 0, ready: false, rack: [], spent: Array(5).fill(false), handVersion: 0, confirmations: new Map()});
@@ -81,8 +101,16 @@ function startIfReady(room, now) {
 export function configure(room, id, data) {
   if (id !== room.host) return {error: 'Süreyi oda sahibi ayarlayabilir.'};
   if (room.phase === 'play') return {error: 'Maç sürerken süre değişmez.'};
-  if (![120, 180, 300, 600].includes(data?.duration)) return {error: 'Geçersiz süre.'};
-  room.duration = data.duration; Object.values(room.players).forEach(p => { p.ready = !!p.isBot; }); return {ok: true};
+  if (!data || (data.duration===undefined && data.size===undefined)) return {error:'Geçersiz ayar.'};
+  if(data.duration!==undefined && ![120,180,300,600].includes(data.duration))return {error:'Geçersiz süre.'};
+  if(data.size!==undefined && !['auto',9,11].includes(data.size))return {error:'Geçersiz tahta boyutu.'};
+  if(data.duration!==undefined)room.duration=data.duration;
+  if(data.size!==undefined) {
+    room.autoSize=data.size==='auto';
+    const size=room.autoSize?(humans(room).length>=5?11:9):data.size;
+    if(size!==room.boardSize)resetPuzzle(room,size);
+  }
+  Object.values(room.players).forEach(p => { p.ready = !!p.isBot; }); return {ok: true};
 }
 export function place(room, id, data, now, deferRefill = false) {
   const player = room.players[id];
@@ -160,28 +188,10 @@ function playBotTurn(room, now) {
   return {placed, points};
 }
 
-// Chunked transfers preserve the platform's 4 KiB per-packet budget.
-export function upload(room, id, data, now) {
-  if (!room.players[id]) return {error: 'Oyuncu bulunamadı.'};
-  if (room.phase === 'play') return {error: 'Maç sürerken tahta yüklenmez.'};
-  if (!data || !Number.isInteger(data.index) || !Number.isInteger(data.total) || data.total < 1 || data.total > 30 || typeof data.chunk !== 'string' || data.chunk.length > 800 || typeof data.token !== 'string' || !/^[a-zA-Z0-9-]{1,40}$/.test(data.token)) return {error: 'Yükleme verisi geçersiz.'};
-  let transfer = room.uploads.get(id);
-  if (data.index === 0) { transfer = {token: data.token, total: data.total, next: 0, text: '', until: now + 30000, revision: room.revision}; room.uploads.set(id, transfer); }
-  if (!transfer || transfer.token !== data.token || transfer.total !== data.total || transfer.next !== data.index || now > transfer.until) return {error: 'Yükleme kesildi. Baştan dene.'};
-  transfer.text += data.chunk; transfer.next++;
-  if (transfer.next !== transfer.total) return {ok: true};
-  room.uploads.delete(id);
-  if (room.revision !== transfer.revision) return {error: 'Başka bir oyuncu yeni tahta yükledi. Önizlemeyi kontrol edip yeniden yükle.'};
-  try { room.puzzle = validatePuzzle(transfer.text); }
-  catch (error) { return {error: error.message}; }
-  room.revision++; room.phase = 'lobby'; room.filled = {}; room.completed = {}; room.feed = [];
-  Object.values(room.players).forEach(p => { p.ready = !!p.isBot; p.rack = []; p.spent = []; });
-  notice(room, `${room.players[id].name} yeni bulmaca yükledi.`);
-  return {ok: true, installed: true};
-}
 export function view(room, id, now) {
   const me = room.players[id];
   return {code: room.code, host: room.host, phase: room.phase, until: room.until, now, duration: room.duration, revision: room.revision,
+    boardSize:room.boardSize, autoSize:room.autoSize,
     title: room.puzzle.title, category: room.puzzle.category, rows: room.puzzle.rows, cols: room.puzzle.cols,
     clueCells: room.puzzle.clueCells,
     cells: room.puzzle.cells.map(c => ({row: c.row, col: c.col, entries: c.entries, ...room.filled[`${c.row},${c.col}`], ...(room.phase === 'end' ? {solution: c.letter} : {})})),

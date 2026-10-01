@@ -1,3 +1,7 @@
+# Arşiv — eski AI/JSON yükleme akışı
+
+Bu akış oyundan kaldırılmıştır. Güncel oyun, TAC havuzundan önceden hazırlanmış rastgele tahtaları kullanır. Bu dosya eski geliştirme talimatlarını belgelemek için korunmuştur.
+
 # Çengel Kapışması — kopyalanabilir AI promptu
 
 Uygulama kategori ve boyutu otomatik ekler. Bu örnek genel kültür ve 9×7 içindir.

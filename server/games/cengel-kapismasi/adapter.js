@@ -1,4 +1,4 @@
-import {createRoom, addPlayer, removePlayer, ready, configure, confirm, upload, tick, view, MAX_PLAYERS} from './game.js';
+import {createRoom, addPlayer, removePlayer, ready, configure, confirm, randomize, tick, view, MAX_PLAYERS} from './game.js';
 const members = room => Object.values(room.players).filter(p => !p.isBot);
 export const adapter = {
   snapshotInterval: 1000, create: ({code, host}) => createRoom({code, host}), members, addPlayer, removePlayer, view,
@@ -15,6 +15,6 @@ export const adapter = {
     ready: {interval: 150, publish: true, handle: ready},
     configure: {interval: 200, publish: true, handle: configure},
     confirm: {interval: 250, publish: true, handle: confirm},
-    upload: {interval: 20, publish: true, handle: upload},
+    randomize: {interval: 500, publish: true, handle: randomize},
   },
 };

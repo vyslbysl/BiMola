@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {io as client} from 'socket.io-client';
 import {validatePuzzle, serializePuzzle, buildPrompt, example, normalize} from '../public/games/cengel-kapismasi/puzzle.js';
 import {starter} from '../public/games/cengel-kapismasi/starter.js';
-import {createRoom, addPlayer, removePlayer, ready, configure, place, confirm, upload, tick, view} from '../server/games/cengel-kapismasi/game.js';
+import {createRoom, addPlayer, removePlayer, ready, configure, place, confirm, tick, view} from '../server/games/cengel-kapismasi/game.js';
 import {createGameServer} from '../server.js';
 
 const puzzle = () => structuredClone(example);
@@ -19,12 +19,6 @@ function room(players = 2) {
 function put(r, id, cell, slot = 0, letter = cell.letter) {
   r.players[id].rack[slot] = letter;
   return place(r, id, {row: cell.row, col: cell.col, slot, letter, revision: r.revision}, 1100);
-}
-function transfer(r, data, player = 'a', token = 'upload') {
-  const text = typeof data === 'string' ? data : JSON.stringify(data), size = 800, total = Math.ceil(text.length / size);
-  let result;
-  for (let index = 0; index < total; index++) result = upload(r, player, {token, total, index, chunk: text.slice(index * size, (index + 1) * size)}, 1000);
-  return result;
 }
 test('shared puzzle contract derives closed cells and preserves Turkish I/İ', () => {
   const p = validatePuzzle(example);
@@ -122,21 +116,6 @@ test('timeout rejects late placement and completes departed players only once', 
   assert.ok(place(r, 'a', {}, r.until).error); assert.equal(tick(r, r.until), true);
   assert.equal(r.phase, 'end'); assert.equal(r.scoreEvents.filter(e => e.completed).length, 2);
   assert.equal(tick(r, r.until + 1), false);
-});
-test('upload is atomic, ordered, phase protected and resets readiness only on success', () => {
-  const r = createRoom({code: '1234', host: 'a'}); addPlayer(r, {id: 'a', name: 'Ada'}); r.players.a.ready = true;
-  assert.ok(transfer(r, '{').error); assert.equal(r.revision, 1); assert.equal(r.players.a.ready, true);
-  assert.equal(transfer(r, example).installed, true); assert.equal(r.revision, 2); assert.equal(r.players.a.ready, false);
-  assert.ok(upload(r, 'a', {token: 'bad', total: 2, index: 1, chunk: '{}'}, 1000).error);
-  ready(r, 'a', true, 1000); assert.ok(transfer(r, example).error);
-});
-test('concurrent uploads cannot overwrite an intervening installed board', () => {
-  const r = createRoom({code: '1234', host: 'a'}); addPlayer(r, {id: 'a', name: 'Ada'}); addPlayer(r, {id: 'b', name: 'Bora'});
-  const text = JSON.stringify(example), total = Math.ceil(text.length / 800);
-  assert.equal(upload(r, 'a', {token: 'first', total, index: 0, chunk: text.slice(0, 800)}, 1000).ok, true);
-  assert.equal(transfer(r, example, 'b').installed, true);
-  let result; for (let index = 1; index < total; index++) result = upload(r, 'a', {token: 'first', total, index, chunk: text.slice(index * 800, (index + 1) * 800)}, 1000);
-  assert.match(result.error, /Başka/);
 });
 
 function event(socket, name, match = () => true) { return new Promise((resolve, reject) => { const timer = setTimeout(() => { socket.off(name, receive); reject(new Error(`Timeout ${name}`)); }, 4000); function receive(data) { if (!match(data)) return; clearTimeout(timer); socket.off(name, receive); resolve(data); } socket.on(name, receive); }); }
@@ -289,7 +268,7 @@ test('late-game hands shrink and repeated letters never outnumber remaining dest
 });
 
 test('user AI 9x9 set validates after the unescaped clue quotation is repaired', () => {
-  const text=readFileSync(new URL('../public/games/cengel-kapismasi/sets/genel-kultur-9x9.json',import.meta.url),'utf8');
+  const text=readFileSync(new URL('../scripts/templates/cengel-9x9.json',import.meta.url),'utf8');
   const p=validatePuzzle(text);
   assert.equal(p.rows,9); assert.equal(p.cols,9); assert.equal(p.entries.length,27);
   assert.equal(p.cells.length+p.clueCells.length+p.blankCells.length,81);

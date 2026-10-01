@@ -1,4 +1,4 @@
-import {buildPrompt, validatePuzzle, serializePuzzle} from './puzzle.js';
+import {validatePuzzle} from './puzzle.js';
 import {starter as example} from './starter.js';
 import {readName, saveName} from '/platform/profile.js';
 import {createRequestId} from './request-id.js';
@@ -6,7 +6,7 @@ import {focusWindow, panWindow} from './focus.js';
 
 const $ = id => document.getElementById(id);
 const socket = io('/games/cengel-kapismasi', {autoConnect: false});
-let state = null, selected = null, active = null, preview = null, validationError = '', noticeTimer, busy = false, pending = false, lastPhase, offset = 0;
+let state = null, selected = null, active = null, noticeTimer, pending = false, lastPhase, offset = 0;
 const cellNodes = new Map(), draft = new Map(); let boardSignature = '', drag = null, ghost = null, confirmRequest = null, suppressPointerClick = false;
 let effectsBusy = 0;
 let magnified = false, focusPage = 0, focusSignature = "", panArea = null, panGesture = null, deferredPacket = null;
@@ -17,13 +17,6 @@ async function command(event, data) {
   const response = await socket.timeout(5000).emitWithAck(event, data);
   if (response?.error) throw new Error(response.error);
   return response;
-}
-function suggestSize(count) { return count <= 3 ? 9 : count <= 6 ? 11 : count <= 9 ? 13 : 15; }
-function promptChanged() {
-  const rows = Number($('rows').value), cols = Number($('cols').value);
-  const valid = [rows, cols].every(n => Number.isInteger(n) && n >= 7 && n <= 21);
-  $('copy-prompt').disabled = !valid;
-  $('prompt').value = valid ? buildPrompt($('category').value, rows, cols) : 'Boyutlar 7–21 arasında tam sayı olmalı.';
 }
 function makeBoard(container, puzzle, showAnswers = false) {
   container.style.gridTemplateColumns = `repeat(${puzzle.cols}, var(--cell))`;
@@ -38,7 +31,8 @@ function makeBoard(container, puzzle, showAnswers = false) {
     if (clueCell) {
       for (const id of clueCell.entries) {
         const entry = puzzle.entries.find(e => e.id === id);
-        const clue = el(showAnswers ? 'div' : 'button', entry.clue, `clue-tile ${entry.direction}`);
+        const clue = el(showAnswers ? 'div' : 'button', undefined, `clue-tile ${entry.direction}`);
+        clue.append(el('span', entry.clue, 'clue-text'));
         clue.dataset.entry = id;
         clue.title = entry.clue;
         if (!showAnswers) { clue.setAttribute('aria-label', `${entry.clue}, ${entry.direction === 'across' ? 'sağa' : 'aşağıya'}, ${entry.length} harf`); clue.onclick = () => selectClue(id); }
@@ -256,7 +250,7 @@ function render(packet) {
   document.body.dataset.phase = state.phase;
   $('room-code').textContent = `ODA ${state.code} · ${state.rows} × ${state.cols}`;
   $('title').textContent = state.title;
-  $('subtitle').textContent = state.phase === 'end' ? `${state.reason} ${winners()}` : state.phase === 'play' ? `${state.category} · Herkes aynı tahtada.` : `${state.category} · ${state.players.some(p => p.isBot) ? 'Tek başınasın; Mola Botu rakibin. Hazırım diyerek başla.' : 'Hazır olduğunda işaretle. Herkes hazırsa maç başlar.'}`;
+  $('subtitle').textContent = state.phase === 'end' ? `${state.reason} ${winners()}` : state.phase === 'play' ? `${state.category} · Herkes aynı tahtada.` : `${state.category} · ${state.players.some(p => p.isBot) ? 'Tek başınasın; Mola Botu rakibin. Hazırım diyerek başla.' : 'Hazır olduğunda işaretle. Herkes hazırsa maç başlar. Her maçta yeni bir tahta gelir.'}`;
   $('progress').textContent = `${state.filled}/${state.total} kutu · ${state.completed}/${state.entries.length} kelime`;
   const signature = `${state.code}:${state.revision}`;
   if (signature !== boardSignature) {
@@ -270,8 +264,9 @@ function render(packet) {
   $('feed').replaceChildren(...state.feed.map(text => el('li', text)));
   $('rack-panel').hidden = state.phase !== 'play'; $('lobby-actions').hidden = state.phase === 'play';
   $('duration').value = state.duration; $('duration').disabled = state.host !== socket.id;
+  $('board-size').value = state.autoSize ? 'auto' : String(state.boardSize); $('board-size').disabled = state.host !== socket.id;
+  $('random-board').disabled = state.host !== socket.id;
   $('ready').textContent = state.players.find(p => p.id === socket.id)?.ready ? '✓ Hazırım · Vazgeç' : state.phase === 'end' ? 'Yeniden hazırım' : 'Hazırım';
-  if (state.phase === 'play' && $('upload-dialog').open) { $('upload-dialog').close(); notify('Maç başladı; yeni bulmacayı maçtan sonra yükleyebilirsin.'); }
   if (lastPhase !== 'end' && state.phase === 'end') { notify(`${state.reason} ${winners()}`); loadScores(); }
   lastPhase = state.phase; updateClock(); applyFocus(); fitPlayArea();
   if (old?.phase === 'play' && old.revision === packet.revision && old.code === packet.code) {
@@ -426,23 +421,14 @@ function fitPlayArea() {
   const dimensions = magnified ? (panArea || focusWindow(state, state.entries.find(e => e.id === active), focusPage)) : state;
   const size = Math.max(1, Math.min(80, (area.clientWidth - dimensions.cols - 1) / dimensions.cols, (area.clientHeight - dimensions.rows - 1) / dimensions.rows));
   $('board').style.setProperty('--cell', `${Math.floor(size * 10) / 10}px`);
+  for(const clue of $('board').querySelectorAll('.clue-tile')) {
+    const count=clue.parentElement.querySelectorAll('.clue-tile').length, dual=count>1;
+    const font=Math.min(dual?11:13,Math.max(dual?4:5,size*(dual?.15:.175)));
+    const lines=Math.max(1,Math.floor((size/count-size*(dual?.07:.11))/(font*(dual?1.08:1.12))));
+    clue.style.setProperty('--clue-lines',String(lines));
+  }
 }
 window.addEventListener('resize', () => { clearFlights(); clearDrag(); panGesture=null; $('board').style.transform=''; fitPlayArea(); });
-function invalidatePreview() { preview = null; $('install').disabled = true; $('preview-scroll').hidden = true; $('preview-clues').replaceChildren(); $('validation').textContent = ''; $('copy-repair').hidden = true; }
-function validate() {
-  invalidatePreview();
-  try {
-    const next = validatePuzzle($('json').value);
-    if (next.rows !== Number($('rows').value) || next.cols !== Number($('cols').value)) throw new Error(`İstenen boyut ${$('rows').value}×${$('cols').value}, gelen boyut ${next.rows}×${next.cols}. AI’dan doğru boyutta yanıt al veya boyut ayarını güncelle.`);
-    preview = next; validationError = ''; $('validation').className = '';
-    $('validation').textContent = `✓ Yerleşim geçerli · ${preview.entries.length} kelime · ${preview.cells.length} harf kutusu. Soruları ve cevapları aşağıda kontrol et.`;
-    makeBoard($('preview'), preview, true); $('preview-scroll').hidden = false; $('install').disabled = false;
-    $('preview-clues').replaceChildren(...preview.entries.map(entry => {
-      const label = el('label', `${entry.id}. ${entry.answer} · ${entry.direction === 'across' ? '→' : '↓'}`), input = el('input');
-      input.value = entry.clue; input.maxLength = 100; input.oninput = () => { entry.clue = input.value; makeBoard($('preview'), preview, true); }; label.append(input); return label;
-    }));
-  } catch (error) { validationError = error.message; $('validation').textContent = validationError; $('validation').className = 'error'; $('copy-repair').hidden = false; }
-}
 async function copy(text) {
   try { await navigator.clipboard.writeText(text); notify('Kopyalandı.'); }
   catch { notify('Otomatik kopyalanamadı. Metin alanını seçip kopyalayabilirsin.'); }
@@ -472,40 +458,8 @@ $('confirm').onclick = confirmDraft;
 $('extras-toggle').onclick = () => { const open = document.body.classList.toggle('show-extras'); $('extras-toggle').setAttribute('aria-expanded', String(open)); $('extras-toggle').textContent = open ? 'Oyuncuları ve ipuçlarını gizle ↑' : 'Oyuncular ve tüm ipuçları ↓'; };
 $('undo-draft').onclick = () => { draft.clear(); selected = null; confirmRequest = null; updateCells(); renderRack(); };
 
-$('upload-open').onclick = () => {
-  const size = suggestSize(state.players.length); $('rows').value = size; $('cols').value = size;
-  $('size-note').textContent = `${state.players.length} kişi için öneri: ${size}×${size}. Boyutları 7–21 arasında değiştirebilirsin.`;
-  promptChanged(); invalidatePreview(); $('upload-dialog').showModal();
-};
-for (const id of ['category', 'rows', 'cols']) $(id).oninput = () => { promptChanged(); invalidatePreview(); };
-$('copy-prompt').onclick = () => copy($('prompt').value);
-$('use-example').onclick = () => { $('rows').value = example.rows; $('cols').value = example.cols; $('category').value = example.category; promptChanged(); $('json').value = JSON.stringify(example, null, 2); validate(); };
-$('use-9x9').onclick = async () => {
-  try {
-    const response = await fetch('./sets/genel-kultur-9x9.json');
-    if (!response.ok) throw new Error('Örnek set yüklenemedi.');
-    const example = await response.json();
-    $('rows').value = example.rows; $('cols').value = example.cols; $('category').value = example.category;
-    promptChanged(); $('json').value = JSON.stringify(example, null, 2); validate();
-  } catch (error) { notify(error.message); }
-};
-$('json').oninput = invalidatePreview; $('validate').onclick = validate;
-$('copy-repair').onclick = () => copy(`${$('prompt').value}\n\nÖNCEKİ JSON:\n${$('json').value.slice(0, 24000)}\n\nUygulamanın kontrolü şu hatayı buldu: ${validationError}\nBu hatayı düzelt, bütün kuralları yeniden kontrol et ve yalnızca düzeltilmiş JSON ver.`);
-$('install').onclick = async () => {
-  if (!preview || busy) return;
-  const code = state?.code; busy = true; $('install').disabled = true; $('json').readOnly = true;
-  try {
-    const clean = serializePuzzle(validatePuzzle(serializePuzzle(preview))), text = JSON.stringify(clean), chunkSize = 800, total = Math.ceil(text.length / chunkSize), token = createRequestId();
-    if (total > 30) throw new Error('Bulmaca çok büyük. Daha az soru kullan.');
-    for (let index = 0; index < total; index++) {
-      if (state?.code !== code || state.phase === 'play') throw new Error('Oda değişti veya maç başladı. Yeniden yükle.');
-      await command('upload', {token, total, index, chunk: text.slice(index * chunkSize, (index + 1) * chunkSize)});
-      if (index < total - 1) await new Promise(resolve => setTimeout(resolve, 35));
-    }
-    $('upload-dialog').close(); notify('Yeni tahta hazır. Herkes hazır olduğunda başlar.');
-  } catch (error) { notify(error.message || 'Yükleme tamamlanamadı.'); }
-  finally { busy = false; $('json').readOnly = false; $('install').disabled = !preview; }
-};
+$('random-board').onclick = async () => { try { await command('randomize'); } catch(error) { notify(error.message); } };
+$('board-size').onchange = async () => { try { await command('configure', {size:$('board-size').value==='auto'?'auto':Number($('board-size').value)}); } catch(error) { notify(error.message); $('board-size').value=state.autoSize?'auto':String(state.boardSize); } };
 $('rules-open').onclick = () => $('rules-dialog').showModal();
 $('scores-open').onclick = () => { loadScores(); $('scores-dialog').showModal(); };
 socket.on('state', render);
@@ -519,7 +473,6 @@ document.addEventListener('keydown', event => {
 });
 const clockTimer = setInterval(() => { if (!document.hidden) updateClock(); }, 500);
 window.addEventListener('pagehide', () => { clearInterval(clockTimer); socket.disconnect(); });
-promptChanged();
 makeBoard($('poster-board'), validatePuzzle(example), true);
 try { const response = await fetch('/api/player', {cache: 'no-store'}); if (!response.ok) notify('Oyuncu kaydı açılamadı; puanların kaydedilmeyebilir.'); }
 catch { notify('Oyuncu kaydı açılamadı; bağlantını kontrol et.'); }

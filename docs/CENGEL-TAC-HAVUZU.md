@@ -14,7 +14,7 @@ Kullanıcının verdiği Parquet dosyası ile kaynaktan indirilen dosyanın SHA-
 - `data/cengel/tac/import-report.json`: sayımlar, filtre nedenleri, uzunluk dağılımı ve dosya özeti.
 - `data/cengel/tac/source-card.md`: kaynak veri kartının kopyası.
 
-Bu dosyalar mevcut `data/` kuralı nedeniyle Git tarafından izlenmez ve `public/` altında değildir. İndirme, dönüştürme ve yerel inceleme tamamlanmıştır; havuz henüz canlı oyuna bağlanmamıştır. Başka sunucuya bu veri kendiliğinden gitmez.
+Bu dosyalar mevcut `data/` kuralı nedeniyle Git tarafından izlenmez ve `public/` altında değildir. Ham bankanın tamamı yerelde tutulur. Bu bankadan hazırlanan 512 doğrulanmış tahta artık oyunda kullanılır; sıkıştırılmış tahta paketi sunucu dosyalarıyla birlikte yayınlanır. Başka sunucuya ham bankayı taşımak gerekmez.
 
 ## Filtreleme ve metin güvenliği
 
@@ -43,6 +43,6 @@ python3 scripts/import-tac.py /path/to/train-00000-of-00001.parquet
 Proje açıklaması veri setleri için ayrı bir Research License belirtir:
 https://github.com/KamyarZeinalipour/CW_Clue_Gen_tr
 
-Veri kartında yayın kullanımına ilişkin açık bir lisans doğrulanmadı. Yerel veriyi GitHub'a veya oyunun herkese açık dosyalarına eklemedik.
+Veri kartında yayın kullanımına ilişkin açık bir lisans doğrulanmadı. Ham bankanın tamamı GitHub'a veya oyunun herkese açık dosyalarına eklenmez. Kullanıcının rastgele oyun talebiyle hazırlanmış tahta paketi sunucuya gömülmüştür; bu teknik entegrasyon kullanım izninin doğrulandığı anlamına gelmez.
 
-Sonraki teknik aşama, kelimeleri uzunluk ve harf konumuna göre indeksleyen, uyumlu çengel tahtaları üreten ve mevcut `validatePuzzle` denetiminden geçen tahtaları saklayan bir üretim motorudur. Oyun tarayıcısına tüm havuz yerine yalnızca oynanan tahtanın görünür bilgileri gönderilir.
+Üretim motoru `scripts/build-cengel-pool.mjs` ve `scripts/generate-cengel-pool.py` içinde uygulanmıştır; kelimeleri uzunluk/harf konumuna göre indeksler, uyumlu tahtaları üretir ve her çıktıyı `validatePuzzle` ile denetler. Oyun tarayıcısına tüm havuz yerine yalnızca oynanan tahtanın görünür bilgileri gönderilir.
