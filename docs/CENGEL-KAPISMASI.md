@@ -92,3 +92,13 @@ Sunucunun doğruladığı yeni tamamlanan kelimelerin harfleri sırayla parlar. 
 Tek gerçek oyuncu olan hazırlık odasına Mola Botu otomatik eklenir. Gerçek oyuncu Hazırım dediğinde botu beklemeden maç başlar. Hazırlıkta ikinci bir insan gelirse bot kaldırılır; oda tekrar tek kişiye düşerse bot geri gelir. Aktif çok oyunculu maçtan birinin ayrılması maç ortasında yeni bot eklemez.
 
 Bot, yalnızca kabul edilen insan onayından sonra kendi beş harflik elindeki harflerle 1–2 doğru boş kutu doldurur. Yanlış harf veya boş onay da botun bir sırasını tetikler; reddedilen hamle ve aynı onayın tekrar gönderilmesi tetiklemez. İnsan tahtayı bitirmişse bot oynamaz. Bot kelime ve beş konum bonusunu aynı kurallarla kazanır. Botun eli istemciye gönderilmez; yalnızca görünür harfleri ve puanı paylaşılır. Kalıcı puan olayları bot için üretilmez. Bot kendi kendine çalışan döngü veya AI çağrısı açmaz. Son insan ayrıldığında oda ve bot temizlenir.
+
+### Büyüteç, el bonusu ve rakip harfleri
+
+Tahta üstündeki Büyüteç, seçili kelimenin çevresini 5×5 kutuluk yakın görünümde gösterir. Uzun kelimelerde Önceki/Sonraki düğmeleri kullanılır; Tüm tahta düğmesi normal görünüme döner. Kaydırma açılmaz; yakın görünümde de aynı kutu koordinatlarına sürükleme ve onay yapılır.
+
+Sunucunun doğruladığı beş harf bonusu “Beşte beş!” ateş ve konfeti kutlamasını açar. Aynı hamlede tamamlanan kelimelerin puanları kutlamaya dahil edilir; +5 el bonusu ayrıca belirtilir. Yanlış ve yalnızca taslak yerleştirmeler bonus kutlaması üretmez.
+
+Rakip ve bot tarafından yeni doldurulan görünür kutulara harfler oyuncunun puan kartından kısa bir yay çizerek uçar. Her kutu yalnızca ilk dolduğunda animasyon alır; gizli yakın görünüm kutuları için uçuş üretilmez. Efektler oyunun durumunu veya onayını geciktirmez; tamamlanınca, oda/tahta/görünüm değişince veya bağlantı kesilince temizlenir. Hareket azaltma tercihinde uçuş gösterilmez.
+
+Onay ve yükleme anahtarları güvenli bağlantı gerektiren crypto.randomUUID bulunmadığında da üretilebilir. Onay hazırlığındaki hatalar dahil bütün hata yolları bekleme durumunu kapatır; normal HTTP yayınında Onaylanıyor durumunda takılma engellenir.

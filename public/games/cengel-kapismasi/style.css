@@ -172,3 +172,7 @@ dialog li{line-height:1.7;margin-bottom:8px}
 #board .question:has(.clue-tile + .clue-tile) .clue-tile{font-size:clamp(4px,calc(var(--cell)*.15),11px);padding:calc(var(--cell)*.035)}
 
 #rack button.drag-source{color:transparent;box-shadow:none;border-style:dashed;background:#fafbf8;transform:none;transition:none}#rack button.drag-source:after{visibility:hidden}#board .drag-source .letter{visibility:hidden}#board .drag-source:after{visibility:hidden}
+
+#magnify{min-height:30px;padding:5px 9px;font-size:11px;white-space:nowrap;color:var(--blue);border-color:#c5d7b9;background:#f2f7ec}#magnify[aria-pressed=true]{background:#deedcf}.focus-navigation{display:flex;justify-content:space-between;align-items:center;gap:6px;min-height:36px;margin-bottom:4px;font-size:10px;color:var(--muted)}.focus-navigation button{min-height:30px;padding:5px 8px;font-size:11px}.board.magnified{border-color:#8ea57d}.board-top #progress{min-width:0}
+
+.opponent-flight{position:fixed;display:grid;place-items:center;pointer-events:none;z-index:10;background:#eaf2e0;border:2px solid #7b9e61;border-radius:8px;font-weight:800;color:#38532d;box-shadow:0 8px 18px #284a2330;will-change:transform}.letter-arriving .letter{visibility:hidden}.hand-celebration .win-card{border-color:#d7ac42;background:#fff8e9f5;box-shadow:0 14px 40px #c1973738}.hand-celebration .win-headline,.hand-celebration .win-points{color:#956719}.hand-bonus{font-size:11px;font-weight:800;letter-spacing:.1em;color:#a57822;background:#fae8b5;padding:5px 10px;border-radius:20px}
