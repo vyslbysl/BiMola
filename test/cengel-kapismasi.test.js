@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {io as client} from 'socket.io-client';
 import {validatePuzzle, serializePuzzle, buildPrompt, example, normalize} from '../public/games/cengel-kapismasi/puzzle.js';
 import {starter} from '../public/games/cengel-kapismasi/starter.js';
@@ -93,7 +94,7 @@ test('wrong letters deduct one but preserve tile, empty cell, and bonus progress
 test('occupied or stale cell and spoofed rack do not penalize or consume a tile', () => {
   const r = room(), cell = r.puzzle.cells[0]; put(r, 'a', cell);
   assert.ok(put(r, 'b', cell).error); assert.equal(r.players.b.score, 0);
-  assert.ok(place(r, 'a', {row: 2, col: 3, slot: 0, letter: 'Z', revision: r.revision}, 1100).error);
+  assert.ok(place(r, 'a', {row: 2, col: 3, slot: 0, letter: r.players.a.rack[0] === 'Z' ? 'J' : 'Z', revision: r.revision}, 1100).error);
   assert.ok(place(r, 'a', {row: 2, col: 3, slot: 0, letter: r.players.a.rack[0], revision: r.revision - 1}, 1100).error);
   assert.equal(r.players.a.answered, 1);
 });
@@ -265,4 +266,33 @@ test('solo bot games publish turns over Socket.IO and disappear when the human l
   for(let i=0;i<20 && server.rooms.size;i++) await new Promise(resolve=>setTimeout(resolve,10));
   assert.equal(server.rooms.size,0);
   a.disconnect();
+});
+
+test('late-game hands shrink and repeated letters never outnumber remaining destinations', () => {
+  const r=room(), kept=[];
+  for(const cell of r.puzzle.cells) if(!kept.some(c=>c.letter===cell.letter) && kept.length<3) kept.push(cell);
+  for(const cell of r.puzzle.cells) if(!kept.includes(cell)) r.filled[`${cell.row},${cell.col}`]={letter:cell.letter,by:'b'};
+  r.players.a.rack=Array(5).fill(kept[0].letter); r.players.b.rack=Array(5).fill(kept[0].letter);
+  const oldVersion=r.players.b.handVersion;
+  assert.equal(confirm(r,'a',{requestId:'shrink',revision:r.revision,handVersion:r.players.a.handVersion,placements:[]},1100).ok,true);
+  for(const p of Object.values(r.players)) {
+    assert.equal(p.rack.filter(Boolean).length,3);
+    assert.deepEqual(p.rack.filter(Boolean).sort(),kept.map(c=>c.letter).sort());
+  }
+  assert.ok(r.players.b.handVersion>oldVersion);
+  assert.ok(confirm(r,'b',{requestId:'stale-hand',revision:r.revision,handVersion:oldVersion,placements:[]},1100).error);
+  for(const cell of kept.slice(0,2)) put(r,'a',cell);
+  for(const p of Object.values(r.players)) assert.deepEqual(p.rack.filter(Boolean),[kept[2].letter]);
+  put(r,'a',kept[2]);
+  assert.equal(r.phase,'end');
+  assert.ok(Object.values(r.players).every(p=>p.rack.every(letter=>letter===null)));
+});
+
+test('user AI 9x9 set validates after the unescaped clue quotation is repaired', () => {
+  const text=readFileSync(new URL('../public/games/cengel-kapismasi/sets/genel-kultur-9x9.json',import.meta.url),'utf8');
+  const p=validatePuzzle(text);
+  assert.equal(p.rows,9); assert.equal(p.cols,9); assert.equal(p.entries.length,27);
+  assert.equal(p.cells.length+p.clueCells.length+p.blankCells.length,81);
+  assert.throws(()=>validatePuzzle(text.replace('İşte, buldum anlamında ünlem','"İşte, buldum!" anlamında ünlem')),/çift tırnak/);
+  assert.match(buildPrompt('Genel kültür',9,9),/clue değerinin içinde düz çift tırnak kullanma/);
 });

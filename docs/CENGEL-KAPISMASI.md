@@ -95,10 +95,18 @@ Bot, yalnızca kabul edilen insan onayından sonra kendi beş harflik elindeki h
 
 ### Büyüteç, el bonusu ve rakip harfleri
 
-Tahta üstündeki Büyüteç, seçili kelimenin çevresini 5×5 kutuluk yakın görünümde gösterir. Uzun kelimelerde Önceki/Sonraki düğmeleri kullanılır; Tüm tahta düğmesi normal görünüme döner. Kaydırma açılmaz; yakın görünümde de aynı kutu koordinatlarına sürükleme ve onay yapılır.
+Tahta üstündeki Büyüteç, seçili kelimenin çevresini 5×5 kutuluk yakın görünümde gösterir. Tahta parmakla veya fareyle her yöne sürüklenerek gezilir; Tüm tahta düğmesi normal görünüme döner. Kaydırma çubuğu açılmaz; yakın görünümde de aynı kutu koordinatlarına sürükleme ve onay yapılır.
 
 Sunucunun doğruladığı beş harf bonusu “Beşte beş!” ateş ve konfeti kutlamasını açar. Aynı hamlede tamamlanan kelimelerin puanları kutlamaya dahil edilir; +5 el bonusu ayrıca belirtilir. Yanlış ve yalnızca taslak yerleştirmeler bonus kutlaması üretmez.
 
-Rakip ve bot tarafından yeni doldurulan görünür kutulara harfler oyuncunun puan kartından kısa bir yay çizerek uçar. Her kutu yalnızca ilk dolduğunda animasyon alır; gizli yakın görünüm kutuları için uçuş üretilmez. Efektler oyunun durumunu veya onayını geciktirmez; tamamlanınca, oda/tahta/görünüm değişince veya bağlantı kesilince temizlenir. Hareket azaltma tercihinde uçuş gösterilmez.
+Onaylanan oyuncu harfleri teker teker, doğruysa yeşil tik, yanlışsa kırmızı çarpı ve −1 etiketiyle gösterilir. Yanlış harf kutudan silinir ve elde kalır. Sonra rakip/bot harfleri puan kartından sırayla uçar; kelime ve el bonusu kutlaması en sonda açılır. Sonuçlar gösterilirken yeni onay kapalıdır. Her kutu yalnızca ilk dolduğunda animasyon alır. Efektler sunucudaki hamle işlemeyi geciktirmez; tamamlanınca, oda/tahta/görünüm değişince veya bağlantı kesilince temizlenir. Hareket azaltma tercihinde uçuş gösterilmez.
 
 Onay ve yükleme anahtarları güvenli bağlantı gerektiren crypto.randomUUID bulunmadığında da üretilebilir. Onay hazırlığındaki hatalar dahil bütün hata yolları bekleme durumunu kapatır; normal HTTP yayınında Onaylanıyor durumunda takılma engellenir.
+
+### Kalan kutulara göre el ve AI örneği
+
+El, her oyuncu için kalan cevap harflerinin çoklu kümesinden üretilir: aynı harf üç boş kutuda varsa elde en fazla üç tane bulunur. Geçerli mevcut harfler konumlarında korunur; boşa çıkanlar yenilenir. Beşten az boş kutu kaldığında boş el konumları gösterilmez. Rakibin hamlesi eli değiştirdiğinde el sürümü artırılır; eski elden gönderilen onay puan kesmeden reddedilir.
+
+Harf altındaki bonus tikleri kaldırılmıştır; konumların bonus ilerlemesi yalnızca El bonusu sayacında gösterilir. Bu sayaç, yeni gelen harfin doğruluğunu ifade etmez.
+
+`sets/genel-kultur-9x9.json` kullanıcının AI çıktısından iç tırnak hatası düzeltilerek hazırlanmış, 27 soru/54 harf kutulu doğrulanmış settir. Hazırlık ekranındaki 9×9 genel kültür örneği düğmesiyle önizlenip yüklenebilir. Sabit prompt, ipucu içindeki alıntılar için tipografik tırnakları ve son JSON sözdizimi kontrolünü açıkça ister; herhangi bir AI'ın ilk çıktısının mutlaka geçerli olacağı garantisi yoktur. Denetim ve düzeltme akışı korunur.

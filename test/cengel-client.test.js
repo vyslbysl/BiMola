@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequestId} from '../public/games/cengel-kapismasi/request-id.js';
-import {focusWindow} from '../public/games/cengel-kapismasi/focus.js';
+import {focusWindow, panWindow} from '../public/games/cengel-kapismasi/focus.js';
 import {validatePuzzle} from '../public/games/cengel-kapismasi/puzzle.js';
 import {starter} from '../public/games/cengel-kapismasi/starter.js';
 
@@ -43,4 +43,14 @@ test('magnifier reaches the far end of long horizontal and vertical words withou
     }
     assert.equal(visible.size,20);
   }
+});
+
+test('drag panning reaches all corners and clamps to a scroll-free board', () => {
+  const puzzle={rows:21,cols:13},start=focusWindow(puzzle,{length:8,startRow:1,startCol:1,direction:'down'});
+  const bottomRight=panWindow(puzzle,start,100,100);
+  assert.equal(bottomRight.row,16); assert.equal(bottomRight.col,8);
+  const topLeft=panWindow(puzzle,bottomRight,-100,-100);
+  assert.equal(topLeft.row,0); assert.equal(topLeft.col,0);
+  assert.equal(topLeft.rows,5); assert.equal(topLeft.cols,5);
+  assert.deepEqual(panWindow(puzzle,start,0,0),start);
 });

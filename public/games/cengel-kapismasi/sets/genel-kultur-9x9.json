@@ -1,0 +1,204 @@
+{
+  "version": 2,
+  "title": "Genel Kültür Çengeli",
+  "category": "Genel kültür",
+  "rows": 9,
+  "cols": 9,
+  "blankCells": [
+    {
+      "row": 0,
+      "col": 0
+    }
+  ],
+  "entries": [
+    {
+      "clue": "Başkenti Pekin olan ülke",
+      "answer": "ÇİN",
+      "row": 0,
+      "col": 4,
+      "direction": "across"
+    },
+    {
+      "clue": "Futbolda topa vurulan uzuv",
+      "answer": "AYAK",
+      "row": 1,
+      "col": 0,
+      "direction": "across"
+    },
+    {
+      "clue": "Âşıkların çaldığı telli çalgı",
+      "answer": "SAZ",
+      "row": 2,
+      "col": 0,
+      "direction": "across"
+    },
+    {
+      "clue": "Sporda hücum, saldırı",
+      "answer": "ATAK",
+      "row": 2,
+      "col": 4,
+      "direction": "across"
+    },
+    {
+      "clue": "Kalori ile ölçülebilen enerji",
+      "answer": "ISI",
+      "row": 3,
+      "col": 0,
+      "direction": "across"
+    },
+    {
+      "clue": "Canlı, ölünün karşıtı",
+      "answer": "DİRİ",
+      "row": 3,
+      "col": 4,
+      "direction": "across"
+    },
+    {
+      "clue": "Avuç içi",
+      "answer": "AYA",
+      "row": 4,
+      "col": 4,
+      "direction": "across"
+    },
+    {
+      "clue": "İşte, buldum anlamında ünlem",
+      "answer": "AHA",
+      "row": 5,
+      "col": 1,
+      "direction": "across"
+    },
+    {
+      "clue": "Antakya'dan geçen nehir",
+      "answer": "ASİ",
+      "row": 5,
+      "col": 5,
+      "direction": "across"
+    },
+    {
+      "clue": "Macar Rapsodileri'nin bestecisi",
+      "answer": "LİSZT",
+      "row": 6,
+      "col": 1,
+      "direction": "across"
+    },
+    {
+      "clue": "Dördüncü halife",
+      "answer": "ALİ",
+      "row": 7,
+      "col": 1,
+      "direction": "across"
+    },
+    {
+      "clue": "Can, tin",
+      "answer": "RUH",
+      "row": 7,
+      "col": 5,
+      "direction": "across"
+    },
+    {
+      "clue": "Brütün karşıtı",
+      "answer": "NET",
+      "row": 8,
+      "col": 1,
+      "direction": "across"
+    },
+    {
+      "clue": "Evin bölümlerinden her biri",
+      "answer": "ODA",
+      "row": 8,
+      "col": 5,
+      "direction": "across"
+    },
+    {
+      "clue": "Kopya olmayan, orijinal",
+      "answer": "ASIL",
+      "row": 0,
+      "col": 1,
+      "direction": "down"
+    },
+    {
+      "clue": "Matem",
+      "answer": "YAS",
+      "row": 0,
+      "col": 2,
+      "direction": "down"
+    },
+    {
+      "clue": "Öğütücü arka dişler",
+      "answer": "AZI",
+      "row": 0,
+      "col": 3,
+      "direction": "down"
+    },
+    {
+      "clue": "Çiftteki sayı",
+      "answer": "İKİ",
+      "row": 0,
+      "col": 8,
+      "direction": "down"
+    },
+    {
+      "clue": "Dört yanı suyla çevrili kara",
+      "answer": "ADA",
+      "row": 1,
+      "col": 5,
+      "direction": "down"
+    },
+    {
+      "clue": "Haldun Taner'in eserler verdiği sahne sanatı",
+      "answer": "TİYATRO",
+      "row": 1,
+      "col": 6,
+      "direction": "down"
+    },
+    {
+      "clue": "Kars ve Iğdır'dan geçen nehir",
+      "answer": "ARAS",
+      "row": 1,
+      "col": 7,
+      "direction": "down"
+    },
+    {
+      "clue": "Brandenburg Konçertoları'nın bestecisi",
+      "answer": "BACH",
+      "row": 4,
+      "col": 0,
+      "direction": "down"
+    },
+    {
+      "clue": "Yüzölçümü",
+      "answer": "ALAN",
+      "row": 4,
+      "col": 2,
+      "direction": "down"
+    },
+    {
+      "clue": "Düzen, aldatmaca",
+      "answer": "HİLE",
+      "row": 4,
+      "col": 3,
+      "direction": "down"
+    },
+    {
+      "clue": "pH değeri 7'den küçük madde",
+      "answer": "ASİT",
+      "row": 4,
+      "col": 4,
+      "direction": "down"
+    },
+    {
+      "clue": "Yok etme",
+      "answer": "İMHA",
+      "row": 4,
+      "col": 8,
+      "direction": "down"
+    },
+    {
+      "clue": "Mızrapla çalınan perdesiz çalgı",
+      "answer": "UD",
+      "row": 6,
+      "col": 7,
+      "direction": "down"
+    }
+  ]
+}

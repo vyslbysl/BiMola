@@ -2,13 +2,14 @@ import {buildPrompt, validatePuzzle, serializePuzzle} from './puzzle.js';
 import {starter as example} from './starter.js';
 import {readName, saveName} from '/platform/profile.js';
 import {createRequestId} from './request-id.js';
-import {focusWindow} from './focus.js';
+import {focusWindow, panWindow} from './focus.js';
 
 const $ = id => document.getElementById(id);
 const socket = io('/games/cengel-kapismasi', {autoConnect: false});
 let state = null, selected = null, active = null, preview = null, validationError = '', noticeTimer, busy = false, pending = false, lastPhase, offset = 0;
 const cellNodes = new Map(), draft = new Map(); let boardSignature = '', drag = null, ghost = null, confirmRequest = null, suppressPointerClick = false;
-let magnified = false, focusPage = 0, focusSignature = "";
+let effectsBusy = 0;
+let magnified = false, focusPage = 0, focusSignature = "", panArea = null, panGesture = null, deferredPacket = null;
 const el = (tag, text, className) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (className) node.className = className; return node; };
 function notify(message) { $('notice').textContent = message; clearTimeout(noticeTimer); noticeTimer = setTimeout(() => { $('notice').textContent = ''; }, 4200); }
 async function command(event, data) {
@@ -61,6 +62,7 @@ function selectClue(id, position) {
     const entry = state.entries.find(e => e.id === id);
     focusPage = position && entry ? Math.floor((entry.direction === 'down' ? position.row - entry.startRow : position.col - entry.startCol) / 3) : 0;
   }
+  if (id !== active) panArea = null;
   active = id; renderClue(); updateCells(); applyFocus(); fitPlayArea();
   for (const button of $('clues').children) button.classList.toggle('active', button.dataset.id === id);
   
@@ -89,7 +91,7 @@ function updateCells() {
   for (const clue of $('board').querySelectorAll('.clue-tile')) clue.classList.toggle('active', clue.dataset.entry === active);
 }
 function stageTile(slot, row, col) {
-  if (!state || state.phase !== 'play' || pending) return;
+  if (!state || state.phase !== 'play' || pending || effectsBusy) return;
   const cell = state.cells.find(c => c.row === row && c.col === col), letter = state.me.rack[slot];
   if (!cell || cell.letter || !letter) return;
   for (const [other, tile] of draft) if (tile.row === row && tile.col === col && other !== slot) draft.delete(other);
@@ -99,7 +101,7 @@ function stageTile(slot, row, col) {
   if (node && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) node.animate([{transform:'scale(.8)', opacity:.5}, {transform:'scale(1.08)', opacity:1}, {transform:'scale(1)', opacity:1}], {duration:180, easing:'ease-out'});
 }
 function onCell(row, col) {
-  if (drag?.moved || pending) return;
+  if (drag?.moved || pending || effectsBusy) return;
   const cell = state.cells.find(c => c.row === row && c.col === col);
   if (!cell) return;
   const next = cell.entries.includes(active) ? selected !== null ? active : cell.entries[(cell.entries.indexOf(active) + 1) % cell.entries.length] : cell.entries[0];
@@ -119,7 +121,7 @@ function clearDrag() {
   if (pointerId !== undefined && $('rack').hasPointerCapture(pointerId)) $('rack').releasePointerCapture(pointerId);
 }
 function beginDrag(event, slot) {
-  if (event.button !== 0 || event.isPrimary === false || drag || pending || state?.phase !== 'play' || !state.me.rack[slot]) return;
+  if (event.button !== 0 || event.isPrimary === false || drag || pending || effectsBusy || state?.phase !== 'play' || !state.me.rack[slot]) return;
   suppressPointerClick = false;
   drag = {slot, pointerId:event.pointerId, source:event.currentTarget, letter:state.me.rack[slot], x:event.clientX, y:event.clientY, moved:false};
   $('rack').setPointerCapture(event.pointerId);
@@ -165,20 +167,34 @@ document.addEventListener('pointerdown', event => {
 }, true);
 document.addEventListener('pointercancel', event => { if (event.pointerId === drag?.pointerId) clearDrag(); });
 $('rack').addEventListener('lostpointercapture', event => { if (event.pointerId === drag?.pointerId) clearDrag(); });
-window.addEventListener('blur', clearDrag);
+window.addEventListener('blur', () => { clearDrag(); panGesture=null; $('board').style.transform=''; });
 async function confirmDraft() {
-  if (pending || state?.phase !== 'play') return;
+  if (pending || effectsBusy || state?.phase !== 'play') return;
   try {
     pending = true; renderRack();
     confirmRequest ||= {requestId: createRequestId(), revision: state.revision, handVersion: state.me.handVersion, placements: [...draft.values()]};
     const response = await command('confirm', confirmRequest);
-    draft.clear(); selected = null; confirmRequest = null;
-    for (const tile of response.results || []) if (tile.wrong) {
-      const node = cellNodes.get(`${tile.row},${tile.col}`); node?.classList.add('bad'); setTimeout(() => node?.classList.remove('bad'), 350);
+    clearDrag();
+    for (const tile of response.results || []) {
+      if (!state || state.revision !== confirmRequest?.revision) break;
+      const node = cellNodes.get(`${tile.row},${tile.col}`);
+      if (magnified && node?.hidden) {
+        const area = panArea || focusWindow(state, state.entries.find(e => e.id === active), focusPage);
+        panArea = panWindow(state, area, tile.row - 2 - area.row, tile.col - 2 - area.col); applyFocus(); fitPlayArea();
+      }
+      if (node && !node.hidden) {
+        const feedback = el('span', tile.wrong ? '✕ −1' : '✓ Doğru', 'tile-verdict');
+        node.classList.add(tile.wrong ? 'tile-wrong' : 'tile-correct'); node.append(feedback);
+        await new Promise(resolve => setTimeout(resolve, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 180 : 500));
+        feedback.remove(); node.classList.remove('tile-wrong', 'tile-correct');
+      }
+      draft.delete(tile.slot);
+      if (tile.wrong && node) { node.classList.remove('draft'); node.querySelector('.letter').textContent = ''; }
     }
+    draft.clear(); selected = null; confirmRequest = null;
     notify(response.message);
   } catch (error) { notify(error.message || 'Onay gönderilemedi; yeniden dene.'); }
-  finally { pending = false; if (state) { updateCells(); renderRack(); } }
+  finally { pending = false; if (deferredPacket && state?.revision === deferredPacket.revision && state?.code === deferredPacket.code) { const packet = deferredPacket; deferredPacket = null; render(packet); } if (state) { updateCells(); renderRack(); } }
 }
 function renderRack() {
   const letters = state.me?.rack || [];
@@ -187,7 +203,7 @@ function renderRack() {
       const button = el('button'); button.dataset.slot = slot;
       button.addEventListener('pointerdown', event => beginDrag(event, slot));
       button.onclick = () => {
-        if (pending || drag) return;
+        if (pending || effectsBusy || drag) return;
         if (draft.has(slot)) { draft.delete(slot); confirmRequest = null; updateCells(); }
         selected = selected === slot ? null : slot; renderRack();
       };
@@ -198,18 +214,19 @@ function renderRack() {
     const button = $('rack').children[slot];
     button.textContent = letter || '·';
     button.classList.toggle('selected', selected === slot);
-    button.classList.toggle('spent', !!state.me.spent[slot]);
+    button.hidden = !letter;
+    button.classList.remove('spent');
     button.classList.toggle('staged', draft.has(slot));
-    button.disabled = !letter || state.phase !== 'play' || pending;
+    button.disabled = !letter || state.phase !== 'play' || pending || !!effectsBusy;
     button.setAttribute('aria-pressed', String(selected === slot));
-    button.setAttribute('aria-label', `${slot + 1}. harf: ${letter || 'yok'}${state.me.spent[slot] ? ', bonus için kullanıldı' : ''}`);
+    button.setAttribute('aria-label', `${slot + 1}. harf: ${letter || 'yok'}`);
   });
   const spent = state.me?.spent.filter(Boolean).length || 0;
-  $('bonus-progress').textContent = `${spent}/5 · +5 bonus`;
+  $('bonus-progress').textContent = `El bonusu: ${spent}/5 · +5 puan`;
   $('my-score').textContent = `${state.players.find(p => p.id === socket.id)?.score || 0} puan`;
   $('rack-hint').textContent = draft.size ? `${draft.size} harf hazır. Onaylamadan önce yerlerini değiştirebilirsin.` : 'Harfleri sürükle veya seçip kutuya dokun. Sonra onayla.';
-  $('confirm').textContent = pending ? 'Onaylanıyor…' : draft.size ? `Onayla · ${draft.size} harf` : 'Onayla';
-  $('confirm').disabled = pending || state.phase !== 'play'; $('undo-draft').disabled = pending || !draft.size;
+  $('confirm').textContent = pending ? 'Harfler kontrol ediliyor…' : effectsBusy ? 'Sonuçlar gösteriliyor…' : draft.size ? `Onayla · ${draft.size} harf` : 'Onayla';
+  $('confirm').disabled = pending || !!effectsBusy || state.phase !== 'play'; $('undo-draft').disabled = pending || !!effectsBusy || !draft.size;
 }
 function renderPlayers() {
   const sorted = [...state.players].sort((a, b) => b.score - a.score);
@@ -227,9 +244,10 @@ function renderPlayers() {
   $('player-count').textContent = `${state.players.filter(p => !p.isBot).length}/12${state.players.some(p => p.isBot) ? ' + bot' : ''}`;
 }
 function render(packet) {
+  if (pending && state?.code === packet.code && state?.revision === packet.revision) { deferredPacket = packet; return; }
   const old = state; state = packet; offset = packet.now - Date.now();
   if (drag && (old?.code !== packet.code || old?.revision !== packet.revision || packet.phase !== 'play' || packet.me?.rack[drag.slot] !== drag.letter)) clearDrag();
-  if (old?.code !== packet.code || old?.revision !== packet.revision) { clearFlights(); document.querySelector('.word-celebration')?.remove(); clearTimeout(celebrationTimer); }
+  if (old?.code !== packet.code || old?.revision !== packet.revision) { effectEpoch++; clearFlights(); document.querySelector('.word-celebration')?.remove(); clearTimeout(celebrationTimer); }
   if (old?.revision !== packet.revision || old?.code !== packet.code || packet.phase !== 'play') { draft.clear(); confirmRequest = null; }
   for (const [slot, tile] of draft) if (packet.me?.rack[slot] !== tile.letter || packet.cells.some(c => c.row === tile.row && c.col === tile.col && c.letter)) { draft.delete(slot); confirmRequest = null; }
   if (selected !== null && (!packet.me?.rack[selected] || old?.me?.rack[selected] !== packet.me.rack[selected] || old?.revision !== packet.revision)) selected = null;
@@ -242,7 +260,7 @@ function render(packet) {
   $('progress').textContent = `${state.filled}/${state.total} kutu · ${state.completed}/${state.entries.length} kelime`;
   const signature = `${state.code}:${state.revision}`;
   if (signature !== boardSignature) {
-    boardSignature = signature; cellNodes.clear(); makeBoard($('board'), state); active = state.entries[0]?.id; focusPage = 0;
+    boardSignature = signature; cellNodes.clear(); makeBoard($('board'), state); active = state.entries[0]?.id; focusPage = 0; panArea = null;
   }
   updateCells(); renderClue(); renderRack(); renderPlayers();
   $('clues').replaceChildren(...state.entries.map(entry => {
@@ -259,21 +277,37 @@ function render(packet) {
   if (old?.phase === 'play' && old.revision === packet.revision && old.code === packet.code) {
     const completed = packet.entries.filter(e => e.completedBy && !old.entries.find(prior => prior.id === e.id)?.completedBy);
     const bonus = (packet.players.find(p => p.id === socket.id)?.bonuses || 0) - (old.players.find(p => p.id === socket.id)?.bonuses || 0);
-    if (completed.length || bonus > 0) celebrateWords(completed, Math.max(0, bonus) * 5);
+
     const previousCells = new Map(old.cells.map(c => [`${c.row},${c.col}`, c]));
-    flyOpponentLetters(packet.cells.filter(c => c.letter && c.by !== socket.id && !previousCells.get(`${c.row},${c.col}`)?.letter));
+    showTurnEffects(completed, Math.max(0, bonus) * 5, packet.cells.filter(c => c.letter && c.by !== socket.id && !previousCells.get(`${c.row},${c.col}`)?.letter));
   }
 }
+let effectQueue = Promise.resolve(), effectEpoch = 0;
+function showTurnEffects(entries, bonus, cells) {
+  if (!entries.length && !bonus && !cells.length) return;
+  effectsBusy++; renderRack();
+  const epoch = effectEpoch;
+  const targets = cells.map(cell => cellNodes.get(`${cell.row},${cell.col}`)).filter(Boolean);
+  targets.forEach(node => node.classList.add('letter-arriving'));
+  effectQueue = effectQueue.then(async () => {
+    if (epoch !== effectEpoch) return;
+    await flyOpponentLetters(cells);
+    if (epoch === effectEpoch && state && (entries.length || bonus)) {
+      celebrateWords(entries, bonus);
+      await new Promise(resolve => setTimeout(resolve, 1700));
+    }
+  }).catch(() => {}).finally(() => { targets.forEach(node => node.classList.remove('letter-arriving')); effectsBusy--; if (state) renderRack(); });
+}
 const flights = new Set();
-function clearFlights() { for (const flight of [...flights]) flight.cleanup(); }
-function flyOpponentLetters(cells) {
+function clearFlights() { for (const flight of [...flights]) flight.cleanup(); document.querySelectorAll('.letter-arriving').forEach(node => node.classList.remove('letter-arriving')); }
+async function flyOpponentLetters(cells) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  cells.forEach((cell, index) => {
+  for (const cell of cells) {
     const target = cellNodes.get(`${cell.row},${cell.col}`);
     const source = [...$('score-strip').children].find(chip => chip.dataset.playerId === cell.by);
-    if (!target || target.hidden || !source) return;
+    if (!target || target.hidden || !source) continue;
     const end = target.getBoundingClientRect(), start = source.getBoundingClientRect();
-    if (!end.width || !end.height || !start.width) return;
+    if (!end.width || !end.height || !start.width) continue;
     const tile = el('div', cell.letter, 'opponent-flight'); tile.setAttribute('aria-hidden', 'true');
     tile.style.width = `${end.width}px`; tile.style.height = `${end.height}px`;
     tile.style.fontSize = `${end.width * .58}px`;
@@ -286,12 +320,13 @@ function flyOpponentLetters(cells) {
       {transform:'translate(0,0) scale(.65) rotate(-12deg)', opacity:.7},
       {transform:`translate(${dx * .55}px,${dy * .45 - 35}px) scale(1.08) rotate(5deg)`, opacity:1, offset:.55},
       {transform:`translate(${dx}px,${dy}px) scale(1) rotate(0deg)`, opacity:1}
-    ], {duration:520, delay:Math.min(index, 9) * 65, easing:'cubic-bezier(.2,.65,.3,1)', fill:'both'});
+    ], {duration:450, easing:'cubic-bezier(.2,.65,.3,1)', fill:'both'});
     let timer;
     const flight = {cleanup() { clearTimeout(timer); flights.delete(flight); target.classList.remove('letter-arriving'); tile.remove(); animation.cancel(); }};
     flights.add(flight); animation.finished.then(flight.cleanup, flight.cleanup);
     timer = setTimeout(flight.cleanup, 1800);
-  });
+    await animation.finished.catch(() => {});
+  }
 }
 let celebrationTimer;
 function celebrateWords(entries, bonus = 0) {
@@ -341,15 +376,14 @@ function updateClock() {
 }
 function applyFocus() {
   if (!state) return;
-  const entry = state.entries.find(e => e.id === active), area = focusWindow(state, entry, focusPage);
+  const entry = state.entries.find(e => e.id === active), area = panArea || focusWindow(state, entry, focusPage);
   const signature = `${magnified}:${area.row}:${area.col}:${area.page}`;
   if (signature !== focusSignature) { clearFlights(); focusSignature = signature; }
   focusPage = area.page;
   $('magnify').textContent = magnified ? '↖ Tüm tahta' : '⌕ Büyüteç';
   $('magnify').setAttribute('aria-pressed', String(magnified));
   $('focus-navigation').hidden = !magnified;
-  $('focus-prev').disabled = !area.page; $('focus-next').disabled = area.page >= area.pages - 1;
-  $('focus-position').textContent = `${entry?.direction === 'down' ? '↓' : '→'} Kelime görünümü · ${area.page + 1}/${area.pages}`;
+  $('focus-position').textContent = `Tahtayı sürükleyerek gezdir`;
   $('board').classList.toggle('magnified', magnified);
   $('board').style.gridTemplateColumns = `repeat(${magnified ? area.cols : state.cols}, var(--cell))`;
   for (const node of $('board').children) {
@@ -359,20 +393,41 @@ function applyFocus() {
     node.style.gridColumn = magnified ? String(col - area.col + 1) : '';
   }
 }
-$('magnify').onclick = () => { clearDrag(); magnified = !magnified; applyFocus(); fitPlayArea(); };
-$('focus-prev').onclick = () => { clearDrag(); focusPage--; applyFocus(); fitPlayArea(); };
-$('focus-next').onclick = () => { clearDrag(); focusPage++; applyFocus(); fitPlayArea(); };
+$('board').addEventListener('pointerdown', event => {
+  if (!magnified || drag || event.button !== 0 || event.isPrimary === false) return;
+  panGesture = {id:event.pointerId, x:event.clientX, y:event.clientY, moved:false, area:panArea || focusWindow(state, state.entries.find(e => e.id === active), focusPage)};
+});
+document.addEventListener('pointermove', event => {
+  if (!panGesture || event.pointerId !== panGesture.id || drag) return;
+  const dx=event.clientX-panGesture.x, dy=event.clientY-panGesture.y;
+  if (!panGesture.moved && Math.hypot(dx,dy)<10) return;
+  panGesture.moved=true; event.preventDefault();
+  const size=parseFloat(getComputedStyle($('board')).getPropertyValue('--cell'))+1;
+  panArea=panWindow(state,panGesture.area,-Math.round(dy/size),-Math.round(dx/size)); applyFocus(); fitPlayArea();
+  const x=dx+(panArea.col-panGesture.area.col)*size, y=dy+(panArea.row-panGesture.area.row)*size;
+  const atEdgeX=(panArea.col===0 && dx>0)||(panArea.col===state.cols-panArea.cols && dx<0);
+  const atEdgeY=(panArea.row===0 && dy>0)||(panArea.row===state.rows-panArea.rows && dy<0);
+  $('board').style.transform=`translate(${atEdgeX ? 0 : x}px,${atEdgeY ? 0 : y}px)`;
+}, {passive:false});
+function endPan(event) {
+  if (event.pointerId !== panGesture?.id) return;
+  if (panGesture.moved) suppressPointerClick=true;
+  panGesture=null; $('board').style.transform='';
+}
+document.addEventListener('pointerup', endPan);
+document.addEventListener('pointercancel', endPan);
+$('magnify').onclick = () => { clearDrag(); magnified = !magnified; panArea = null; applyFocus(); fitPlayArea(); };
 function fitPlayArea() {
   if (!state) return;
   const column = document.querySelector('.play-column');
   const top = column.getBoundingClientRect().top + window.scrollY;
   column.style.setProperty('--play-height', `${Math.max(280, window.innerHeight - top - 14)}px`);
   const area = $('board').parentElement;
-  const dimensions = magnified ? focusWindow(state, state.entries.find(e => e.id === active), focusPage) : state;
+  const dimensions = magnified ? (panArea || focusWindow(state, state.entries.find(e => e.id === active), focusPage)) : state;
   const size = Math.max(1, Math.min(80, (area.clientWidth - dimensions.cols - 1) / dimensions.cols, (area.clientHeight - dimensions.rows - 1) / dimensions.rows));
   $('board').style.setProperty('--cell', `${Math.floor(size * 10) / 10}px`);
 }
-window.addEventListener('resize', () => { clearFlights(); clearDrag(); fitPlayArea(); });
+window.addEventListener('resize', () => { clearFlights(); clearDrag(); panGesture=null; $('board').style.transform=''; fitPlayArea(); });
 function invalidatePreview() { preview = null; $('install').disabled = true; $('preview-scroll').hidden = true; $('preview-clues').replaceChildren(); $('validation').textContent = ''; $('copy-repair').hidden = true; }
 function validate() {
   invalidatePreview();
@@ -425,6 +480,15 @@ $('upload-open').onclick = () => {
 for (const id of ['category', 'rows', 'cols']) $(id).oninput = () => { promptChanged(); invalidatePreview(); };
 $('copy-prompt').onclick = () => copy($('prompt').value);
 $('use-example').onclick = () => { $('rows').value = example.rows; $('cols').value = example.cols; $('category').value = example.category; promptChanged(); $('json').value = JSON.stringify(example, null, 2); validate(); };
+$('use-9x9').onclick = async () => {
+  try {
+    const response = await fetch('./sets/genel-kultur-9x9.json');
+    if (!response.ok) throw new Error('Örnek set yüklenemedi.');
+    const example = await response.json();
+    $('rows').value = example.rows; $('cols').value = example.cols; $('category').value = example.category;
+    promptChanged(); $('json').value = JSON.stringify(example, null, 2); validate();
+  } catch (error) { notify(error.message); }
+};
 $('json').oninput = invalidatePreview; $('validate').onclick = validate;
 $('copy-repair').onclick = () => copy(`${$('prompt').value}\n\nÖNCEKİ JSON:\n${$('json').value.slice(0, 24000)}\n\nUygulamanın kontrolü şu hatayı buldu: ${validationError}\nBu hatayı düzelt, bütün kuralları yeniden kontrol et ve yalnızca düzeltilmiş JSON ver.`);
 $('install').onclick = async () => {
@@ -445,8 +509,8 @@ $('install').onclick = async () => {
 $('rules-open').onclick = () => $('rules-dialog').showModal();
 $('scores-open').onclick = () => { loadScores(); $('scores-dialog').showModal(); };
 socket.on('state', render);
-socket.on('disconnect', () => { clearFlights(); clearDrag(); state = null; selected = null; boardSignature = ''; lastPhase = null; $('room').hidden = true; $('home').hidden = false; document.body.classList.remove('in-room'); notify('Bağlantı kesildi. Bağlanınca oda kodunla tekrar gir.'); });
-socket.on('room-error', data => { clearFlights(); clearDrag(); state = null; $('room').hidden = true; $('home').hidden = false; document.body.classList.remove('in-room'); notify(data.error); });
+socket.on('disconnect', () => { effectEpoch++; clearFlights(); clearDrag(); panGesture = null; deferredPacket = null; state = null; selected = null; boardSignature = ''; lastPhase = null; $('room').hidden = true; $('home').hidden = false; document.body.classList.remove('in-room'); notify('Bağlantı kesildi. Bağlanınca oda kodunla tekrar gir.'); });
+socket.on('room-error', data => { effectEpoch++; clearFlights(); clearDrag(); panGesture = null; deferredPacket = null; state = null; $('room').hidden = true; $('home').hidden = false; document.body.classList.remove('in-room'); notify(data.error); });
 socket.on('connect_error', () => notify('Oyun sunucusuna bağlanılamadı. Yeniden deneniyor.'));
 document.addEventListener('keydown', event => {
   if (event.target.closest('input,textarea,select,dialog') || !state || state.phase !== 'play') return;

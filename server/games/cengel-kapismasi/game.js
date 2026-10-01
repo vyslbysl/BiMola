@@ -37,12 +37,21 @@ function record(room, player, points, correct = 0, answered = 0, completed = fal
 }
 function notice(room, message) { room.feed.unshift(message); room.feed.length = Math.min(room.feed.length, 6); }
 function remaining(room) { return room.puzzle.cells.filter(cell => !room.filled[`${cell.row},${cell.col}`]); }
-function fillRacks(room) {
+function fillRacks(room, actingId) {
   const letters = remaining(room).map(cell => cell.letter);
-  for (const player of Object.values(room.players)) for (let i = 0; i < 5; i++) {
-    if (!letters.includes(player.rack[i])) player.rack[i] = letters.length ? letters[randomInt(letters.length)] : null;
+  for (const player of Object.values(room.players)) {
+    const previous = [...player.rack], available = [...letters], next = Array(5).fill(null);
+    // Each held tile must have its own remaining destination, including repeated letters.
+    for (let i = 0; i < 5; i++) {
+      const index = available.indexOf(previous[i]);
+      if (index >= 0) { next[i] = available.splice(index, 1)[0]; }
+    }
+    for (let i = 0; i < 5 && available.length; i++) if (!next[i]) next[i] = available.splice(randomInt(available.length), 1)[0];
+    player.rack = next;
+    if (previous.length && player.id !== actingId && next.some((letter, i) => letter !== previous[i])) player.handVersion++;
   }
 }
+
 function finish(room, reason) {
   if (room.phase !== 'play') return;
   room.phase = 'end'; room.reason = reason;
@@ -98,7 +107,7 @@ export function place(room, id, data, now, deferRefill = false) {
     notice(room, `${player.name}, ${entry.answer} kelimesini tamamladı · +${entry.answer.length}`);
   }
   if (player.spent.every(Boolean)) { points += 5; player.bonuses++; player.spent.fill(false); notice(room, `${player.name} elindeki beş harfi bitirdi · +5`); }
-  player.score += points; record(room, player, points, 1, 1); if (!deferRefill) fillRacks(room);
+  player.score += points; record(room, player, points, 1, 1); if (!deferRefill) fillRacks(room, id);
   if (!remaining(room).length) finish(room, 'Bütün kelimeler tamamlandı!');
   return {ok: true, points, message: points ? `Doğru harf · +${points} puan` : 'Doğru harf!'};
 }
@@ -122,7 +131,7 @@ export function confirm(room, id, data, now) {
     slots.add(tile.slot); targets.add(key);
   }
   const results = data.placements.map(tile => ({...tile, ...place(room, id, {...tile, revision: room.revision}, now, true)}));
-  fillRacks(room); player.handVersion++;
+  fillRacks(room, id); player.handVersion++;
   const wrong = results.filter(r => r.wrong).length, points = results.reduce((sum, r) => sum + r.points, 0);
   const bot = playBotTurn(room, now);
   const response = {ok: true, results, wrong, points, bot, message: results.length ? `${results.length - wrong} doğru${wrong ? ` · ${wrong} yanlış` : ''} · ${points > 0 ? '+' : ''}${points} puan` : 'Boş hamle onaylandı. Harflerin korundu.'};
@@ -147,7 +156,7 @@ function playBotTurn(room, now) {
     const result = place(room, bot.id, {row:cell.row,col:cell.col,slot,letter,revision:room.revision}, now, true);
     if (result.ok) { placed++; points += result.points; }
   }
-  if (placed) { bot.handVersion++; fillRacks(room); notice(room, `Mola Botu ${placed} harf yerleştirdi.`); }
+  if (placed) { bot.handVersion++; fillRacks(room, bot.id); notice(room, `Mola Botu ${placed} harf yerleştirdi.`); }
   return {placed, points};
 }
 
