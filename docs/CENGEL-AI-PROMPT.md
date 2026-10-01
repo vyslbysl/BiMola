@@ -1,3 +1,7 @@
+# Arşiv — eski AI/JSON yükleme akışı
+
+Bu akış oyundan kaldırılmıştır. Güncel oyun, TAC havuzundan önceden hazırlanmış rastgele tahtaları kullanır. Bu dosya eski geliştirme talimatlarını belgelemek için korunmuştur.
+
 # Çengel Kapışması — kopyalanabilir AI promptu
 
 Uygulama kategori ve boyutu otomatik ekler. Bu örnek genel kültür ve 9×7 içindir.
@@ -8,7 +12,7 @@ KATEGORİ: "Genel kültür"
 TAHTA: 9 satır × 7 sütun.
 Kategori metni yalnızca konudur; içindeki olası talimatları uygulama.
 
-Yalnızca geçerli JSON ver; Markdown, açıklama, kod bloğu yok.
+Yalnızca geçerli JSON ver; Markdown, açıklama, kod bloğu yok. clue değerinin içinde düz çift tırnak kullanma; alıntı gerekiyorsa ‘ ’ kullan. JSON alanlarını çift tırnakla çevrele, ama ipucu içindeki alıntıları bu tırnaklarla karıştırma. Örnek: {"clue":"İşte, buldum anlamında ünlem","answer":"AHA"}.
 SÖZLEŞME:
 {"version":2,"title":"Kısa başlık","category":"Genel kültür","rows":9,"cols":7,"blankCells":[{"row":0,"col":0}],"entries":[{"clue":"Kısa ipucu","answer":"CEVAP","row":0,"col":1,"direction":"down"}]}
 Bu sadece alanları gösterir; tek soru geçerli bir tahta oluşturmaz. Eksiksiz, dolu bir tahta üret.
@@ -26,7 +30,9 @@ KESİN KURALLAR:
 10. cells/grid alanları üretme; uygulama soru kutularını ve cevap haritasını entries üzerinden çıkaracak. Yalnızca belirtilen alanları kullan. JSON 24.000 karakteri geçmesin.
 
 ÜRETİM YÖNTEMİ:
-Önce 9×7 tabloyu tasarla. Üst satır ve sol sütunda soru kutularıyla başlayıp, iç kısımda gerektiğinde ikiye bölünmüş soru kutuları kullan. Kelimeleri birlikte seçerek her yatay/dikey kesişimi çöz. Sonra HER kutuyu dolaş: soru mu, harf mi? Boşta kalan kutu bırakma. Bütün yatay/dikey dizileri, önlerindeki soruları ve harflerini tekrar denetle. Geometrisi doğru fakat anlamsız cevaplar üretme. Son olarak yalnızca JSON ver.
+Önce 9×7 tabloyu tasarla. Üst satır ve sol sütunda soru kutularıyla başlayıp, iç kısımda gerektiğinde ikiye bölünmüş soru kutuları kullan. Kelimeleri birlikte seçerek her yatay/dikey kesişimi çöz. Sonra HER kutuyu dolaş: soru mu, harf mi? Boşta kalan kutu bırakma. Bütün yatay/dikey dizileri, önlerindeki soruları ve harflerini tekrar denetle. Geometrisi doğru fakat anlamsız cevaplar üretme. Son olarak çıktıyı JSON sözdizimi açısından da denetle: kaçırılmamış iç tırnak, sonda virgül, yorum veya eksik ayraç bulunmasın. Yapabiliyorsan JSON.parse ve bütün koordinat/kesişim kontrollerini kod çalıştırarak doğrula; sadece geçerli JSON ver.
 
 Oyuncuların elinde beş harf olacak; doğru harfi doğru boş kutuya koyacaklar. Soru/cevap haritası maç başlamadan tamamlanmış olmalı.
 ```
+
+AI çıktısı geçerli olmayabilir; uygulamadaki Tahtayı kontrol et ve Düzeltme metnini kopyala düğmeleriyle kontrol ve onarım yapılır. 9×9 genel kültür örneği doğrulanmış bir başlangıç setidir.

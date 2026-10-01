@@ -168,7 +168,56 @@ dialog li{line-height:1.7;margin-bottom:8px}
 @keyframes spark-burst{0%{opacity:0;transform:translate(0,0) scale(.1)}12%{opacity:1}75%{opacity:1}100%{opacity:0;transform:translate(var(--spark-x),var(--spark-y)) rotate(var(--spark-rotate)) scale(.7)}}
 @media(prefers-reduced-motion:reduce){.word-win{outline:2px solid #80a855;outline-offset:-2px}.win-card{animation:none;opacity:1}.win-star,.win-points{animation:none}}
 
-#board .clue-tile{font-size:clamp(5px,calc(var(--cell)*.175),13px);padding:calc(var(--cell)*.055)}
-#board .question:has(.clue-tile + .clue-tile) .clue-tile{font-size:clamp(4px,calc(var(--cell)*.15),11px);padding:calc(var(--cell)*.035)}
+#board .clue-tile{font-size:clamp(5px,calc(var(--cell)*.175),16px);padding:calc(var(--cell)*.055)}
+#board .question:has(.clue-tile + .clue-tile) .clue-tile{font-size:clamp(4px,calc(var(--cell)*.15),13px);padding:calc(var(--cell)*.035)}
 
 #rack button.drag-source{color:transparent;box-shadow:none;border-style:dashed;background:#fafbf8;transform:none;transition:none}#rack button.drag-source:after{visibility:hidden}#board .drag-source .letter{visibility:hidden}#board .drag-source:after{visibility:hidden}
+
+#magnify{min-height:30px;padding:5px 9px;font-size:11px;white-space:nowrap;color:var(--blue);border-color:#c5d7b9;background:#f2f7ec}#magnify[aria-pressed=true]{background:#deedcf}.focus-navigation{display:flex;justify-content:space-between;align-items:center;gap:6px;min-height:36px;margin-bottom:4px;font-size:10px;color:var(--muted)}.focus-navigation button{min-height:30px;padding:5px 8px;font-size:11px}.board.magnified{border-color:#8ea57d}.board-top #progress{min-width:0}
+
+.opponent-flight{position:fixed;display:grid;place-items:center;pointer-events:none;z-index:10;background:#eaf2e0;border:2px solid #7b9e61;border-radius:8px;font-weight:800;color:#38532d;box-shadow:0 8px 18px #284a2330;will-change:transform}.letter-arriving .letter{visibility:hidden}.hand-celebration .win-card{border-color:#d7ac42;background:#fff8e9f5;box-shadow:0 14px 40px #c1973738}.hand-celebration .win-headline,.hand-celebration .win-points{color:#956719}.hand-bonus{font-size:11px;font-weight:800;letter-spacing:.1em;color:#a57822;background:#fae8b5;padding:5px 10px;border-radius:20px}
+
+.board.magnified{touch-action:none;cursor:grab}.board.magnified:active{cursor:grabbing}.tile-verdict{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);padding:2px 3px;border-radius:4px;font-size:clamp(7px,calc(var(--cell)*.17),12px);white-space:nowrap;z-index:4;background:#fff;font-weight:900}.cell.tile-wrong{background:#ffe0dc;color:#a82323;box-shadow:inset 0 0 0 3px #ce4848;animation:tile-shake .35s ease}.cell.tile-correct{background:#d5edb8;color:#285d20;box-shadow:inset 0 0 0 3px #7ca958;animation:tile-check .4s ease}.tile-wrong .tile-verdict{color:#a82323}.tile-correct .tile-verdict{color:#285d20}.focus-navigation{justify-content:center}@keyframes tile-shake{20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}@keyframes tile-check{40%{transform:scale(1.08)}}
+
+.clue-tile{flex:1 1 0;min-width:0}.clue-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--clue-lines,4);overflow:hidden;max-width:100%;min-height:0}.clue-panel .clue-choice{flex-shrink:0}
+
+/* The board is the playing surface; the hand lives beside it on wide screens. */
+body.in-room header{max-width:none;padding:10px 24px}
+body.in-room main{max-width:1600px;padding:12px 24px}
+.in-room .room-heading{margin-bottom:12px}.in-room .room-heading h1{font-size:22px}
+.in-room .play-layout{grid-template-columns:minmax(0,1fr) 320px;gap:28px}
+.in-room .play-column{max-width:none}
+.in-room .board-scroll{align-items:flex-start}
+.in-room .board{margin:0 auto}
+.in-room .game-rail{display:block;border:0;padding:0;min-width:0}
+.game-rail .clue-panel{align-items:flex-start;background:#eff6e7;border:1px solid #d1dfc6;border-radius:12px;padding:14px;min-height:80px;margin-bottom:16px;font-size:16px}
+.game-rail #my-score{display:block;color:var(--blue);white-space:nowrap}
+.game-rail .rack-panel{padding:0 0 20px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+.game-rail .rack{gap:7px}.game-rail .rack button{width:54px;height:60px;font-size:32px}
+.game-rail .rack-top{flex-wrap:wrap;font-size:12px}.game-rail #bonus-progress{order:3;width:100%;font-size:11px}
+.game-rail .confirm-row{margin-top:16px;gap:8px}.game-rail .confirm-row #confirm{min-width:0;flex:1}
+.game-rail .rack-panel .muted{text-align:left;line-height:1.5;min-height:32px}
+.game-rail .lobby-actions{padding:0 0 20px}.game-rail #random-board{width:100%}.game-rail #ready{width:100%}
+.game-rail .side-section{margin-bottom:14px;padding-bottom:14px}.game-rail .all-clues{margin-top:0}.game-rail .all-clues summary{font-weight:700}
+.score-chip.self strong{color:#477d33}.board-top #clock{background:#eef4e8;padding:6px 10px;border-radius:6px;white-space:nowrap}
+@media(min-width:701px){.in-room .room-heading .muted{display:block}.in-room .score-chip{padding:8px 18px}.in-room .board-top{margin-bottom:10px}}
+@media(max-width:700px){
+ body.in-room header{padding:8px 12px}.in-room main{padding:8px 10px}
+ .in-room .play-layout{grid-template-columns:1fr;gap:12px}
+ .in-room .room-heading h1{font-size:18px}.in-room .room-heading{margin-bottom:8px}
+ .in-room .play-column{min-height:0}.in-room .game-rail{display:grid;grid-template-columns:1fr;gap:0}
+ .game-rail .clue-panel{padding:9px 12px;min-height:48px;margin-bottom:10px;font-size:13px}
+ .game-rail .rack-panel{padding:0 0 12px;margin-bottom:14px}.game-rail .rack-top{flex-wrap:nowrap;margin-bottom:8px;font-size:11px}
+ .game-rail #bonus-progress{order:0;width:auto;font-size:10px}.game-rail .rack{gap:10px}.game-rail .rack button{width:52px;height:50px;font-size:29px}
+ .game-rail .confirm-row{margin-top:10px}.game-rail .confirm-row #confirm{flex:0 1 240px}
+ .game-rail .rack-panel .muted{min-height:0;font-size:10px;margin-top:6px;text-align:center}
+ .game-rail .lobby-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-bottom:12px}.game-rail #random-board,.game-rail #ready{grid-column:1/-1}
+ .in-room .score-strip{margin-bottom:6px}.in-room .board-top{margin-bottom:8px}
+}
+
+/* Keep the game's chrome compact so the square can use the full height. */
+body.in-room header{padding:6px 24px;min-height:0}body.in-room header button{min-height:32px;font-size:11px;padding:6px 10px}
+.in-room .room-heading{margin-bottom:8px}.in-room .room-heading .eyebrow{margin-bottom:4px}.in-room .room-heading h1{margin-bottom:0}
+.in-room .room-heading .muted{display:none}.in-room .score-strip{margin-bottom:6px}.in-room .score-chip{padding:6px 16px}
+.in-room .board-top{margin-bottom:8px}
+@media(max-width:700px){body.in-room main{padding:8px 10px}body.in-room header{padding:6px 10px}.in-room .score-chip{padding:6px 12px}.in-room .board-top{font-size:10px}}

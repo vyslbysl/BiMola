@@ -20,7 +20,7 @@ Node.js 24 (Docker ile aynı sürüm) önerilir. Geliştirme: `npm run dev`. Do�
 - `public/games/prop-hunt/`: yalnızca bu oyunun ekranları, Three.js sahnesi, fizik yardımcıları ve varlıkları.
 - `server/games/ates-koprusu/` + `public/games/ates-koprusu/`: Ateş Köprüsü kuralları, başlangıç soru seti (yalnız sunucuda), soru şeması/AI promptu ve köprü sahnesi.
 - `server/games/snake/` + `public/games/snake/`: Yılan Meydanı oyun kuralları, oda adaptörü, 3B arena ve oyun ekranı. Oda kurabilir veya dört haneli kodla katılabilirsin; ilk oyuncu oda sahibidir. Oda üst sınırı 12 oyuncu (botlar dahil), ızgara üst sınırı 128×128 ve bot üst sınırı 11’dir.
-- `server/games/cengel-kapismasi/` + `public/games/cengel-kapismasi/`: ortak çengel tahtası, özel beş harflik eller, AI promptu/JSON yerleşim doğrulaması ve 2D arayüz.
+- `server/games/cengel-kapismasi/` + `public/games/cengel-kapismasi/`: ortak çengel tahtası, özel beş harflik eller, TAC havuzundan hazırlanmış rastgele tahtalar ve 2D arayüz.
 
 **Yeni oyun eklemek, lobiyi veya diğer oyunları değiştirmeyi gerektirmez.** Kendi istemci klasörünü ve sunucu adaptörünü ekleyip kataloğa kaydet. Çalışan iki farklı oyunla izolasyonu gösteren örnek test `test/platform.test.js` içindedir; test oyunu kullanıcı kataloğuna eklenmez.
 
@@ -55,4 +55,4 @@ Oyuncu kimliği tarayıcıdaki HttpOnly çerezle tanınır; adı değiştirmek p
 
 [Köprü arayüzü, joker kuralları ve kalıcı puan notları](docs/ATES-KOPRUSU-JOKERLER.md)
 
-[Çengel Kapışması kuralları, soru yükleme ve mimarisi](docs/CENGEL-KAPISMASI.md) · [Kopyalanabilir çengel AI promptu](docs/CENGEL-AI-PROMPT.md)
+[Çengel Kapışması kuralları ve rastgele tahta mimarisi](docs/CENGEL-KAPISMASI.md) · [TAC havuzu ve içerik hazırlama](docs/CENGEL-TAC-HAVUZU.md)

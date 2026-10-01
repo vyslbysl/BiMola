@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "cengel:build-pool": "node scripts/build-cengel-pool.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "boards": 512,
+  "sizes": {
+    "9": 272,
+    "11": 240
+  },
+  "source": "https://huggingface.co/datasets/Kamyar-zeinalipour/TAC",
+  "preparedCluePairs": 64812
+}

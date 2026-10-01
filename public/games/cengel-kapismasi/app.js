@@ -1,11 +1,14 @@
-import {buildPrompt, validatePuzzle, serializePuzzle} from './puzzle.js';
+import {validatePuzzle} from './puzzle.js';
 import {starter as example} from './starter.js';
 import {readName, saveName} from '/platform/profile.js';
+import {createRequestId} from './request-id.js';
 
 const $ = id => document.getElementById(id);
 const socket = io('/games/cengel-kapismasi', {autoConnect: false});
-let state = null, selected = null, active = null, preview = null, validationError = '', noticeTimer, busy = false, pending = false, lastPhase, offset = 0;
+let state = null, selected = null, active = null, noticeTimer, pending = false, lastPhase, offset = 0;
 const cellNodes = new Map(), draft = new Map(); let boardSignature = '', drag = null, ghost = null, confirmRequest = null, suppressPointerClick = false;
+let effectsBusy = 0;
+let deferredPacket = null;
 const el = (tag, text, className) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (className) node.className = className; return node; };
 function notify(message) { $('notice').textContent = message; clearTimeout(noticeTimer); noticeTimer = setTimeout(() => { $('notice').textContent = ''; }, 4200); }
 async function command(event, data) {
@@ -13,13 +16,6 @@ async function command(event, data) {
   const response = await socket.timeout(5000).emitWithAck(event, data);
   if (response?.error) throw new Error(response.error);
   return response;
-}
-function suggestSize(count) { return count <= 3 ? 9 : count <= 6 ? 11 : count <= 9 ? 13 : 15; }
-function promptChanged() {
-  const rows = Number($('rows').value), cols = Number($('cols').value);
-  const valid = [rows, cols].every(n => Number.isInteger(n) && n >= 7 && n <= 21);
-  $('copy-prompt').disabled = !valid;
-  $('prompt').value = valid ? buildPrompt($('category').value, rows, cols) : 'Boyutlar 7–21 arasında tam sayı olmalı.';
 }
 function makeBoard(container, puzzle, showAnswers = false) {
   container.style.gridTemplateColumns = `repeat(${puzzle.cols}, var(--cell))`;
@@ -30,10 +26,12 @@ function makeBoard(container, puzzle, showAnswers = false) {
   const children = [];
   for (let row = 0; row < puzzle.rows; row++) for (let col = 0; col < puzzle.cols; col++) {
     const key = `${row},${col}`, cell = cells.get(key), clueCell = clueCells.get(key), button = el(cell && !showAnswers ? 'button' : 'div', undefined, 'cell' + (cell ? '' : clueCell ? ' question' : ' blocked'));
+    button.dataset.gridRow = row; button.dataset.gridCol = col;
     if (clueCell) {
       for (const id of clueCell.entries) {
         const entry = puzzle.entries.find(e => e.id === id);
-        const clue = el(showAnswers ? 'div' : 'button', entry.clue, `clue-tile ${entry.direction}`);
+        const clue = el(showAnswers ? 'div' : 'button', undefined, `clue-tile ${entry.direction}`);
+        clue.append(el('span', entry.clue, 'clue-text'));
         clue.dataset.entry = id;
         clue.title = entry.clue;
         if (!showAnswers) { clue.setAttribute('aria-label', `${entry.clue}, ${entry.direction === 'across' ? 'sağa' : 'aşağıya'}, ${entry.length} harf`); clue.onclick = () => selectClue(id); }
@@ -53,9 +51,8 @@ function makeBoard(container, puzzle, showAnswers = false) {
   container.replaceChildren(...children);
 }
 function selectClue(id) {
-  active = id; renderClue(); updateCells();
+  active = id; renderClue(); updateCells(); fitPlayArea();
   for (const button of $('clues').children) button.classList.toggle('active', button.dataset.id === id);
-  
 }
 function renderClue() {
   const entry = state?.entries.find(e => e.id === active);
@@ -81,7 +78,7 @@ function updateCells() {
   for (const clue of $('board').querySelectorAll('.clue-tile')) clue.classList.toggle('active', clue.dataset.entry === active);
 }
 function stageTile(slot, row, col) {
-  if (!state || state.phase !== 'play' || pending) return;
+  if (!state || state.phase !== 'play' || state.me?.confirmed || pending || effectsBusy) return;
   const cell = state.cells.find(c => c.row === row && c.col === col), letter = state.me.rack[slot];
   if (!cell || cell.letter || !letter) return;
   for (const [other, tile] of draft) if (tile.row === row && tile.col === col && other !== slot) draft.delete(other);
@@ -91,11 +88,11 @@ function stageTile(slot, row, col) {
   if (node && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) node.animate([{transform:'scale(.8)', opacity:.5}, {transform:'scale(1.08)', opacity:1}, {transform:'scale(1)', opacity:1}], {duration:180, easing:'ease-out'});
 }
 function onCell(row, col) {
-  if (drag?.moved || pending) return;
+  if (drag?.moved || pending || effectsBusy) return;
   const cell = state.cells.find(c => c.row === row && c.col === col);
   if (!cell) return;
   const next = cell.entries.includes(active) ? selected !== null ? active : cell.entries[(cell.entries.indexOf(active) + 1) % cell.entries.length] : cell.entries[0];
-  selectClue(next);
+  selectClue(next, {row,col});
   if (state.phase !== 'play' || cell.letter) return;
   if (selected !== null) stageTile(selected, row, col);
   else {
@@ -111,7 +108,7 @@ function clearDrag() {
   if (pointerId !== undefined && $('rack').hasPointerCapture(pointerId)) $('rack').releasePointerCapture(pointerId);
 }
 function beginDrag(event, slot) {
-  if (event.button !== 0 || event.isPrimary === false || drag || pending || state?.phase !== 'play' || !state.me.rack[slot]) return;
+  if (event.button !== 0 || event.isPrimary === false || drag || pending || effectsBusy || state?.phase !== 'play' || state.me?.confirmed || !state.me.rack[slot]) return;
   suppressPointerClick = false;
   drag = {slot, pointerId:event.pointerId, source:event.currentTarget, letter:state.me.rack[slot], x:event.clientX, y:event.clientY, moved:false};
   $('rack').setPointerCapture(event.pointerId);
@@ -157,20 +154,30 @@ document.addEventListener('pointerdown', event => {
 }, true);
 document.addEventListener('pointercancel', event => { if (event.pointerId === drag?.pointerId) clearDrag(); });
 $('rack').addEventListener('lostpointercapture', event => { if (event.pointerId === drag?.pointerId) clearDrag(); });
-window.addEventListener('blur', clearDrag);
+window.addEventListener('blur', () => { clearDrag();  });
 async function confirmDraft() {
-  if (pending || state?.phase !== 'play') return;
-  pending = true; renderRack();
-  confirmRequest ||= {requestId: crypto.randomUUID(), revision: state.revision, handVersion: state.me.handVersion, placements: [...draft.values()]};
+  if (pending || effectsBusy || state?.phase !== 'play' || state.me?.confirmed) return;
   try {
+    pending = true; renderRack();
+    confirmRequest ||= {requestId: createRequestId(), revision: state.revision, round:state.round, handVersion: state.me.handVersion, placements: [...draft.values()]};
     const response = await command('confirm', confirmRequest);
-    draft.clear(); selected = null; confirmRequest = null;
-    for (const tile of response.results || []) if (tile.wrong) {
-      const node = cellNodes.get(`${tile.row},${tile.col}`); node?.classList.add('bad'); setTimeout(() => node?.classList.remove('bad'), 350);
+    clearDrag();
+    for (const tile of response.results || []) {
+      if (!state || state.revision !== confirmRequest?.revision) break;
+      const node = cellNodes.get(`${tile.row},${tile.col}`);
+      if (node && !node.hidden) {
+        const feedback = el('span', tile.wrong ? '✕ −1' : '✓ +1', 'tile-verdict');
+        node.classList.add(tile.wrong ? 'tile-wrong' : 'tile-correct'); node.append(feedback);
+        await new Promise(resolve => setTimeout(resolve, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 180 : 500));
+        feedback.remove(); node.classList.remove('tile-wrong', 'tile-correct');
+      }
+      draft.delete(tile.slot);
+      if (tile.wrong && node) { node.classList.remove('draft'); node.querySelector('.letter').textContent = ''; }
     }
+    draft.clear(); selected = null; confirmRequest = null;
     notify(response.message);
   } catch (error) { notify(error.message || 'Onay gönderilemedi; yeniden dene.'); }
-  finally { pending = false; if (state) { updateCells(); renderRack(); } }
+  finally { pending = false; if (deferredPacket && state?.revision === deferredPacket.revision && state?.code === deferredPacket.code) { const packet = deferredPacket; deferredPacket = null; render(packet); } if (state) { updateCells(); renderRack(); } }
 }
 function renderRack() {
   const letters = state.me?.rack || [];
@@ -179,7 +186,7 @@ function renderRack() {
       const button = el('button'); button.dataset.slot = slot;
       button.addEventListener('pointerdown', event => beginDrag(event, slot));
       button.onclick = () => {
-        if (pending || drag) return;
+        if (pending || effectsBusy || drag || state.me?.confirmed) return;
         if (draft.has(slot)) { draft.delete(slot); confirmRequest = null; updateCells(); }
         selected = selected === slot ? null : slot; renderRack();
       };
@@ -190,46 +197,54 @@ function renderRack() {
     const button = $('rack').children[slot];
     button.textContent = letter || '·';
     button.classList.toggle('selected', selected === slot);
-    button.classList.toggle('spent', !!state.me.spent[slot]);
+    button.hidden = !letter;
+    button.classList.remove('spent');
     button.classList.toggle('staged', draft.has(slot));
-    button.disabled = !letter || state.phase !== 'play' || pending;
+    button.disabled = !letter || state.phase !== 'play' || state.me?.confirmed || pending || !!effectsBusy;
     button.setAttribute('aria-pressed', String(selected === slot));
-    button.setAttribute('aria-label', `${slot + 1}. harf: ${letter || 'yok'}${state.me.spent[slot] ? ', bonus için kullanıldı' : ''}`);
+    button.setAttribute('aria-label', `${slot + 1}. harf: ${letter || 'yok'}`);
   });
   const spent = state.me?.spent.filter(Boolean).length || 0;
-  $('bonus-progress').textContent = `${spent}/5 · +5 bonus`;
+  $('bonus-progress').textContent = `El bonusu: ${spent}/5 · +5 puan`;
   $('my-score').textContent = `${state.players.find(p => p.id === socket.id)?.score || 0} puan`;
-  $('rack-hint').textContent = draft.size ? `${draft.size} harf hazır. Onaylamadan önce yerlerini değiştirebilirsin.` : 'Harfleri sürükle veya seçip kutuya dokun. Sonra onayla.';
-  $('confirm').textContent = pending ? 'Onaylanıyor…' : draft.size ? `Onayla · ${draft.size} harf` : 'Onayla';
-  $('confirm').disabled = pending || state.phase !== 'play'; $('undo-draft').disabled = pending || !draft.size;
+  $('rack-hint').textContent = draft.size ? `${draft.size} harf hazır. Onaylamadan önce yerlerini değiştirebilirsin.` : state.me?.confirmed ? 'Onaylandı. Diğer oyuncular bekleniyor; süre dolunca yeni tur başlayacak.' : 'Doğru harf +1 · yanlış −1. Yeni harfler tur sonunda gelir.';
+  $('confirm').textContent = pending ? 'Harfler kontrol ediliyor…' : effectsBusy ? 'Sonuçlar gösteriliyor…' : state.me?.confirmed ? '✓ Onaylandı · Bekleniyor' : draft.size ? `Onayla · ${draft.size} harf` : 'Onayla · Pas geç';
+  $('confirm').disabled = pending || !!effectsBusy || state.phase !== 'play' || state.me?.confirmed; $('undo-draft').disabled = pending || !!effectsBusy || !draft.size;
 }
 function renderPlayers() {
   const sorted = [...state.players].sort((a, b) => b.score - a.score);
   $('score-strip').replaceChildren(...sorted.map(p => {
     const chip = el('div', undefined, `score-chip${p.id === socket.id ? ' self' : ''}`);
+    chip.dataset.playerId = p.id;
     chip.append(el('span', p.id === socket.id ? 'Sen' : p.isBot ? `${p.name} · Bot` : p.name), el('strong', String(p.score))); return chip;
   }));
   $('players').replaceChildren(...sorted.map(p => {
     const li = el('li', undefined, p.id === socket.id ? 'self' : '');
     const details = el('div', p.name + (p.isBot ? ' · bot' : p.id === socket.id ? ' · sen' : ''));
-    details.append(el('small', state.phase === 'play' || state.phase === 'end' ? `${p.words} kelime · ${p.bonuses} bonus` : p.ready ? '✓ Hazır' : 'Hazırlanıyor'));
+    details.append(el('small', state.phase === 'play' || state.phase === 'end' ? `${p.correct} harf · ${p.words} kelime${state.phase === 'play' ? p.confirmed ? ' · ✓ Onaylandı' : ' · Düşünüyor' : ''}` : p.ready ? '✓ Hazır' : 'Hazırlanıyor'));
     li.append(details, el('strong', String(p.score))); return li;
   }));
   $('player-count').textContent = `${state.players.filter(p => !p.isBot).length}/12${state.players.some(p => p.isBot) ? ' + bot' : ''}`;
 }
 function render(packet) {
+  if (pending && state?.code === packet.code && state?.revision === packet.revision) { deferredPacket = packet; return; }
   const old = state; state = packet; offset = packet.now - Date.now();
-  if (drag && (old?.code !== packet.code || old?.revision !== packet.revision || packet.phase !== 'play' || packet.me?.rack[drag.slot] !== drag.letter)) clearDrag();
-  if (old?.code !== packet.code || old?.revision !== packet.revision) { document.querySelector('.word-celebration')?.remove(); clearTimeout(celebrationTimer); }
-  if (old?.revision !== packet.revision || old?.code !== packet.code || packet.phase !== 'play') { draft.clear(); confirmRequest = null; }
-  for (const [slot, tile] of draft) if (packet.me?.rack[slot] !== tile.letter || packet.cells.some(c => c.row === tile.row && c.col === tile.col && c.letter)) { draft.delete(slot); confirmRequest = null; }
+  const expiredDraft = old?.phase === 'play' && old?.round !== packet.round && draft.size > 0;
+  if (drag && (old?.code !== packet.code || old?.revision !== packet.revision || old?.round !== packet.round || packet.me?.confirmed || packet.phase !== 'play' || packet.me?.rack[drag.slot] !== drag.letter)) clearDrag();
+  if (old?.code !== packet.code || old?.revision !== packet.revision) { effectEpoch++; clearFlights(); document.querySelector('.word-celebration')?.remove(); clearTimeout(celebrationTimer); }
+  if (old?.revision !== packet.revision || old?.code !== packet.code || old?.round !== packet.round || packet.me?.confirmed || packet.phase !== 'play') { draft.clear(); confirmRequest = null; }
+  let contestedDraft = false;
+  for (const [slot, tile] of draft) if (packet.me?.rack[slot] !== tile.letter || packet.cells.some(c => c.row === tile.row && c.col === tile.col && c.letter)) { draft.delete(slot); confirmRequest = null; contestedDraft = true; }
+  if (expiredDraft) notify('Tur bitti. Onaylanmayan taslak gönderilmedi.');
+  else if (contestedDraft) notify('Rakip kutuyu doldurdu veya harfin boş karşılığı kalmadı. Kalan hamleni düzenleyebilirsin; puanın değişmedi.');
   if (selected !== null && (!packet.me?.rack[selected] || old?.me?.rack[selected] !== packet.me.rack[selected] || old?.revision !== packet.revision)) selected = null;
   $('home').hidden = true; $('room').hidden = false;
   document.body.classList.add('in-room');
   document.body.dataset.phase = state.phase;
+  if (old?.code !== packet.code || old?.phase !== packet.phase) window.scrollTo({top:0,behavior:'instant'});
   $('room-code').textContent = `ODA ${state.code} · ${state.rows} × ${state.cols}`;
   $('title').textContent = state.title;
-  $('subtitle').textContent = state.phase === 'end' ? `${state.reason} ${winners()}` : state.phase === 'play' ? `${state.category} · Herkes aynı tahtada.` : `${state.category} · ${state.players.some(p => p.isBot) ? 'Tek başınasın; Mola Botu rakibin. Hazırım diyerek başla.' : 'Hazır olduğunda işaretle. Herkes hazırsa maç başlar.'}`;
+  $('subtitle').textContent = state.phase === 'end' ? `${state.reason} ${winners()}` : state.phase === 'play' ? `${state.round}. tur · Doğru harf +1 · Kelimeyi tamamla, bonusu al.` : `${state.category} · ${state.players.some(p => p.isBot) ? 'Tek başınasın; Mola Botu rakibin. Hazırım diyerek başla.' : 'Hazır olduğunda işaretle. Herkes hazırsa maç başlar. Her maçta yeni bir tahta gelir.'}`;
   $('progress').textContent = `${state.filled}/${state.total} kutu · ${state.completed}/${state.entries.length} kelime`;
   const signature = `${state.code}:${state.revision}`;
   if (signature !== boardSignature) {
@@ -238,22 +253,72 @@ function render(packet) {
   updateCells(); renderClue(); renderRack(); renderPlayers();
   $('clues').replaceChildren(...state.entries.map(entry => {
     const button = el('button', `${entry.id}. ${entry.direction === 'across' ? '→' : '↓'} ${entry.clue} (${entry.length})${entry.answer ? ' · ' + entry.answer : ''}`, `${entry.completedBy ? 'done ' : ''}${entry.id === active ? 'active' : ''}`);
-    button.dataset.id = entry.id; button.onclick = () => selectClue(entry.id, true); return button;
+    button.dataset.id = entry.id; button.onclick = () => selectClue(entry.id); return button;
   }));
   $('feed').replaceChildren(...state.feed.map(text => el('li', text)));
   $('rack-panel').hidden = state.phase !== 'play'; $('lobby-actions').hidden = state.phase === 'play';
   $('duration').value = state.duration; $('duration').disabled = state.host !== socket.id;
+  $('board-size').value = state.autoSize ? 'auto' : String(state.boardSize); $('board-size').disabled = state.host !== socket.id;
+  $('random-board').disabled = state.host !== socket.id;
   $('ready').textContent = state.players.find(p => p.id === socket.id)?.ready ? '✓ Hazırım · Vazgeç' : state.phase === 'end' ? 'Yeniden hazırım' : 'Hazırım';
-  if (state.phase === 'play' && $('upload-dialog').open) { $('upload-dialog').close(); notify('Maç başladı; yeni bulmacayı maçtan sonra yükleyebilirsin.'); }
   if (lastPhase !== 'end' && state.phase === 'end') { notify(`${state.reason} ${winners()}`); loadScores(); }
   lastPhase = state.phase; updateClock(); fitPlayArea();
   if (old?.phase === 'play' && old.revision === packet.revision && old.code === packet.code) {
     const completed = packet.entries.filter(e => e.completedBy && !old.entries.find(prior => prior.id === e.id)?.completedBy);
-    if (completed.length) celebrateWords(completed);
+    const bonus = (packet.players.find(p => p.id === socket.id)?.bonuses || 0) - (old.players.find(p => p.id === socket.id)?.bonuses || 0);
+
+    const previousCells = new Map(old.cells.map(c => [`${c.row},${c.col}`, c]));
+    showTurnEffects(completed, Math.max(0, bonus) * 5, packet.cells.filter(c => c.letter && c.by !== socket.id && !previousCells.get(`${c.row},${c.col}`)?.letter));
+  }
+}
+let effectQueue = Promise.resolve(), effectEpoch = 0;
+function showTurnEffects(entries, bonus, cells) {
+  if (!entries.length && !bonus && !cells.length) return;
+  effectsBusy++; renderRack();
+  const epoch = effectEpoch;
+  const targets = cells.map(cell => cellNodes.get(`${cell.row},${cell.col}`)).filter(Boolean);
+  targets.forEach(node => node.classList.add('letter-arriving'));
+  effectQueue = effectQueue.then(async () => {
+    if (epoch !== effectEpoch) return;
+    await flyOpponentLetters(cells);
+    if (epoch === effectEpoch && state && (entries.length || bonus)) {
+      celebrateWords(entries, bonus);
+      await new Promise(resolve => setTimeout(resolve, 1700));
+    }
+  }).catch(() => {}).finally(() => { targets.forEach(node => node.classList.remove('letter-arriving')); effectsBusy--; if (state) renderRack(); });
+}
+const flights = new Set();
+function clearFlights() { for (const flight of [...flights]) flight.cleanup(); document.querySelectorAll('.letter-arriving').forEach(node => node.classList.remove('letter-arriving')); }
+async function flyOpponentLetters(cells) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (const cell of cells) {
+    const target = cellNodes.get(`${cell.row},${cell.col}`);
+    const source = [...$('score-strip').children].find(chip => chip.dataset.playerId === cell.by);
+    if (!target || target.hidden || !source) continue;
+    const end = target.getBoundingClientRect(), start = source.getBoundingClientRect();
+    if (!end.width || !end.height || !start.width) continue;
+    const tile = el('div', cell.letter, 'opponent-flight'); tile.setAttribute('aria-hidden', 'true');
+    tile.style.width = `${end.width}px`; tile.style.height = `${end.height}px`;
+    tile.style.fontSize = `${end.width * .58}px`;
+    const x = Math.max(0, Math.min(innerWidth - end.width, start.left + start.width / 2 - end.width / 2));
+    const y = start.top + start.height / 2 - end.height / 2;
+    tile.style.left = `${x}px`; tile.style.top = `${y}px`;
+    const dx = end.left - x, dy = end.top - y;
+    target.classList.add('letter-arriving'); document.body.append(tile);
+    const animation = tile.animate([
+      {transform:'translate(0,0) scale(.65) rotate(-12deg)', opacity:.7},
+      {transform:`translate(${dx * .55}px,${dy * .45 - 35}px) scale(1.08) rotate(5deg)`, opacity:1, offset:.55},
+      {transform:`translate(${dx}px,${dy}px) scale(1) rotate(0deg)`, opacity:1}
+    ], {duration:450, easing:'cubic-bezier(.2,.65,.3,1)', fill:'both'});
+    let timer;
+    const flight = {cleanup() { clearTimeout(timer); flights.delete(flight); target.classList.remove('letter-arriving'); tile.remove(); animation.cancel(); }};
+    flights.add(flight); animation.finished.then(flight.cleanup, flight.cleanup);
+    timer = setTimeout(flight.cleanup, 1800);
+    await animation.finished.catch(() => {});
   }
 }
 let celebrationTimer;
-function celebrateWords(entries) {
+function celebrateWords(entries, bonus = 0) {
   const own = entries.filter(e => e.completedBy === socket.id);
   for (const entry of entries) {
     const cells = state.cells.filter(c => c.entries.includes(entry.id)).sort((a, b) => entry.direction === 'across' ? a.col - b.col : a.row - b.row);
@@ -264,15 +329,16 @@ function celebrateWords(entries) {
       setTimeout(() => node.classList.remove('word-win'), 1100 + index * 55);
     });
   }
-  if (!own.length) return;
+  if (!own.length && !bonus) return;
   const scroll = $('board').parentElement, stage = scroll.closest('.play-column');
   stage.querySelector('.word-celebration')?.remove(); clearTimeout(celebrationTimer);
-  const celebration = el('div', undefined, 'word-celebration');
+  const celebration = el('div', undefined, 'word-celebration' + (bonus ? ' hand-celebration' : ''));
   celebration.setAttribute('role', 'status');
-  const headline = el('strong', own.length > 1 ? 'ÇİFTE KELİME!' : 'TAM İSABET!', 'win-headline');
+  const headline = el('strong', bonus ? 'BEŞTE BEŞ!' : own.length > 1 ? 'ÇİFTE KELİME!' : 'TAM İSABET!', 'win-headline');
   const words = own.map(entry => state.cells.filter(c => c.entries.includes(entry.id)).sort((a, b) => entry.direction === 'across' ? a.col - b.col : a.row - b.row).map(c => c.letter).join(''));
   const card = el('div', undefined, 'win-card');
-  card.append(el('span', '✦', 'win-star'), headline, el('span', words.join(' + '), 'win-words'), el('strong', `+${own.reduce((sum, e) => sum + e.length, 0)} PUAN`, 'win-points'));
+  card.append(el('span', bonus ? '🔥' : '✦', 'win-star'), headline, el('span', words.length ? words.join(' + ') : 'Beş harfin de yerini buldu!', 'win-words'), el('strong', `+${own.reduce((sum, e) => sum + e.length, bonus)} PUAN`, 'win-points'));
+  if (bonus) card.append(el('span', '+5 EL BONUSU', 'hand-bonus'));
   celebration.append(card);
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) for (let index = 0; index < 16; index++) {
     const spark = el('i', undefined, 'win-spark'), angle = index * Math.PI / 8;
@@ -295,33 +361,27 @@ function winners() {
 }
 function updateClock() {
   const seconds = state?.phase === 'play' ? Math.max(0, Math.ceil((state.until - Date.now() - offset) / 1000)) : 0;
-  $('clock').textContent = state?.phase === 'play' ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : state?.phase === 'end' ? 'Tahta kapandı' : 'Hazırlık';
+  $('clock').textContent = state?.phase === 'play' ? `Tur ${state.round} · ${seconds} sn` : state?.phase === 'end' ? 'Tahta kapandı' : 'Hazırlık';
 }
 function fitPlayArea() {
   if (!state) return;
   const column = document.querySelector('.play-column');
   const top = column.getBoundingClientRect().top + window.scrollY;
-  column.style.setProperty('--play-height', `${Math.max(280, window.innerHeight - top - 14)}px`);
+  const compact = window.matchMedia('(max-width: 700px)').matches;
+  const chrome = $('score-strip').getBoundingClientRect().height + document.querySelector('.board-top').getBoundingClientRect().height + 20;
+  column.style.setProperty('--play-height', `${compact ? column.clientWidth * state.rows / state.cols + chrome : Math.max(280, window.innerHeight - top - 14)}px`);
   const area = $('board').parentElement;
-  const size = Math.max(1, Math.min(80, (area.clientWidth - state.cols - 1) / state.cols, (area.clientHeight - state.rows - 1) / state.rows));
+  const dimensions = state;
+  const size = Math.max(1, Math.min((area.clientWidth - dimensions.cols - 1) / dimensions.cols, (area.clientHeight - dimensions.rows - 1) / dimensions.rows));
   $('board').style.setProperty('--cell', `${Math.floor(size * 10) / 10}px`);
+  for(const clue of $('board').querySelectorAll('.clue-tile')) {
+    const count=clue.parentElement.querySelectorAll('.clue-tile').length, dual=count>1;
+    const font=Math.min(dual?13:16,Math.max(dual?4:5,size*(dual?.15:.175)));
+    const lines=Math.max(1,Math.floor((size/count-size*(dual?.07:.11))/(font*(dual?1.08:1.12))));
+    clue.style.setProperty('--clue-lines',String(lines));
+  }
 }
-window.addEventListener('resize', () => { clearDrag(); fitPlayArea(); });
-function invalidatePreview() { preview = null; $('install').disabled = true; $('preview-scroll').hidden = true; $('preview-clues').replaceChildren(); $('validation').textContent = ''; $('copy-repair').hidden = true; }
-function validate() {
-  invalidatePreview();
-  try {
-    const next = validatePuzzle($('json').value);
-    if (next.rows !== Number($('rows').value) || next.cols !== Number($('cols').value)) throw new Error(`İstenen boyut ${$('rows').value}×${$('cols').value}, gelen boyut ${next.rows}×${next.cols}. AI’dan doğru boyutta yanıt al veya boyut ayarını güncelle.`);
-    preview = next; validationError = ''; $('validation').className = '';
-    $('validation').textContent = `✓ Yerleşim geçerli · ${preview.entries.length} kelime · ${preview.cells.length} harf kutusu. Soruları ve cevapları aşağıda kontrol et.`;
-    makeBoard($('preview'), preview, true); $('preview-scroll').hidden = false; $('install').disabled = false;
-    $('preview-clues').replaceChildren(...preview.entries.map(entry => {
-      const label = el('label', `${entry.id}. ${entry.answer} · ${entry.direction === 'across' ? '→' : '↓'}`), input = el('input');
-      input.value = entry.clue; input.maxLength = 100; input.oninput = () => { entry.clue = input.value; makeBoard($('preview'), preview, true); }; label.append(input); return label;
-    }));
-  } catch (error) { validationError = error.message; $('validation').textContent = validationError; $('validation').className = 'error'; $('copy-repair').hidden = false; }
-}
+window.addEventListener('resize', () => { clearFlights(); clearDrag(); fitPlayArea(); });
 async function copy(text) {
   try { await navigator.clipboard.writeText(text); notify('Kopyalandı.'); }
   catch { notify('Otomatik kopyalanamadı. Metin alanını seçip kopyalayabilirsin.'); }
@@ -343,44 +403,20 @@ $('join-form').onsubmit = async event => {
   catch (error) { notify(error.message || 'Oda açılamadı.'); }
   finally { $('join-button').disabled = false; }
 };
-$('leave').onclick = () => { clearDrag(); socket.emit('leave'); state = null; lastPhase = null; selected = null; boardSignature = ''; $('room').hidden = true; $('home').hidden = false; document.body.classList.remove('in-room'); loadScores(); };
+$('leave').onclick = () => { clearFlights(); clearDrag(); socket.emit('leave'); state = null; lastPhase = null; selected = null; boardSignature = ''; $('room').hidden = true; $('home').hidden = false; document.body.classList.remove('in-room'); loadScores(); };
 $('invite').onclick = () => copy(`${location.origin}/games/cengel-kapismasi/?room=${state.code}`);
 $('ready').onclick = async () => { try { await command('ready', !state.players.find(p => p.id === socket.id)?.ready); } catch (error) { notify(error.message); } };
 $('duration').onchange = async () => { try { await command('configure', {duration: Number($('duration').value)}); } catch (error) { notify(error.message); $('duration').value = state.duration; } };
 $('confirm').onclick = confirmDraft;
-$('extras-toggle').onclick = () => { const open = document.body.classList.toggle('show-extras'); $('extras-toggle').setAttribute('aria-expanded', String(open)); $('extras-toggle').textContent = open ? 'Oyuncuları ve ipuçlarını gizle ↑' : 'Oyuncular ve tüm ipuçları ↓'; };
 $('undo-draft').onclick = () => { draft.clear(); selected = null; confirmRequest = null; updateCells(); renderRack(); };
 
-$('upload-open').onclick = () => {
-  const size = suggestSize(state.players.length); $('rows').value = size; $('cols').value = size;
-  $('size-note').textContent = `${state.players.length} kişi için öneri: ${size}×${size}. Boyutları 7–21 arasında değiştirebilirsin.`;
-  promptChanged(); invalidatePreview(); $('upload-dialog').showModal();
-};
-for (const id of ['category', 'rows', 'cols']) $(id).oninput = () => { promptChanged(); invalidatePreview(); };
-$('copy-prompt').onclick = () => copy($('prompt').value);
-$('use-example').onclick = () => { $('rows').value = example.rows; $('cols').value = example.cols; $('category').value = example.category; promptChanged(); $('json').value = JSON.stringify(example, null, 2); validate(); };
-$('json').oninput = invalidatePreview; $('validate').onclick = validate;
-$('copy-repair').onclick = () => copy(`${$('prompt').value}\n\nÖNCEKİ JSON:\n${$('json').value.slice(0, 24000)}\n\nUygulamanın kontrolü şu hatayı buldu: ${validationError}\nBu hatayı düzelt, bütün kuralları yeniden kontrol et ve yalnızca düzeltilmiş JSON ver.`);
-$('install').onclick = async () => {
-  if (!preview || busy) return;
-  const code = state?.code; busy = true; $('install').disabled = true; $('json').readOnly = true;
-  try {
-    const clean = serializePuzzle(validatePuzzle(serializePuzzle(preview))), text = JSON.stringify(clean), chunkSize = 800, total = Math.ceil(text.length / chunkSize), token = crypto.randomUUID();
-    if (total > 30) throw new Error('Bulmaca çok büyük. Daha az soru kullan.');
-    for (let index = 0; index < total; index++) {
-      if (state?.code !== code || state.phase === 'play') throw new Error('Oda değişti veya maç başladı. Yeniden yükle.');
-      await command('upload', {token, total, index, chunk: text.slice(index * chunkSize, (index + 1) * chunkSize)});
-      if (index < total - 1) await new Promise(resolve => setTimeout(resolve, 35));
-    }
-    $('upload-dialog').close(); notify('Yeni tahta hazır. Herkes hazır olduğunda başlar.');
-  } catch (error) { notify(error.message || 'Yükleme tamamlanamadı.'); }
-  finally { busy = false; $('json').readOnly = false; $('install').disabled = !preview; }
-};
+$('random-board').onclick = async () => { try { await command('randomize'); } catch(error) { notify(error.message); } };
+$('board-size').onchange = async () => { try { await command('configure', {size:$('board-size').value==='auto'?'auto':Number($('board-size').value)}); } catch(error) { notify(error.message); $('board-size').value=state.autoSize?'auto':String(state.boardSize); } };
 $('rules-open').onclick = () => $('rules-dialog').showModal();
 $('scores-open').onclick = () => { loadScores(); $('scores-dialog').showModal(); };
 socket.on('state', render);
-socket.on('disconnect', () => { clearDrag(); state = null; selected = null; boardSignature = ''; lastPhase = null; $('room').hidden = true; $('home').hidden = false; document.body.classList.remove('in-room'); notify('Bağlantı kesildi. Bağlanınca oda kodunla tekrar gir.'); });
-socket.on('room-error', data => { clearDrag(); state = null; $('room').hidden = true; $('home').hidden = false; document.body.classList.remove('in-room'); notify(data.error); });
+socket.on('disconnect', () => { effectEpoch++; clearFlights(); clearDrag(); deferredPacket = null; state = null; selected = null; boardSignature = ''; lastPhase = null; $('room').hidden = true; $('home').hidden = false; document.body.classList.remove('in-room'); notify('Bağlantı kesildi. Bağlanınca oda kodunla tekrar gir.'); });
+socket.on('room-error', data => { effectEpoch++; clearFlights(); clearDrag(); deferredPacket = null; state = null; $('room').hidden = true; $('home').hidden = false; document.body.classList.remove('in-room'); notify(data.error); });
 socket.on('connect_error', () => notify('Oyun sunucusuna bağlanılamadı. Yeniden deneniyor.'));
 document.addEventListener('keydown', event => {
   if (event.target.closest('input,textarea,select,dialog') || !state || state.phase !== 'play') return;
@@ -389,7 +425,6 @@ document.addEventListener('keydown', event => {
 });
 const clockTimer = setInterval(() => { if (!document.hidden) updateClock(); }, 500);
 window.addEventListener('pagehide', () => { clearInterval(clockTimer); socket.disconnect(); });
-promptChanged();
 makeBoard($('poster-board'), validatePuzzle(example), true);
 try { const response = await fetch('/api/player', {cache: 'no-store'}); if (!response.ok) notify('Oyuncu kaydı açılamadı; puanların kaydedilmeyebilir.'); }
 catch { notify('Oyuncu kaydı açılamadı; bağlantını kontrol et.'); }
