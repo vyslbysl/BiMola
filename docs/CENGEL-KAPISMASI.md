@@ -28,21 +28,21 @@ npm run cengel:build-pool
 
 ## Harfler ve puanlar
 
-- Özel el en fazla beş harftir. Her harfin kalan tahtada ayrı bir boş karşılığı vardır. Beşten az kutu kalınca görünür el küçülür; yinelenen harfler kalan aynı harflerin sayısını aşamaz.
+- Özel el en fazla beş harftir. Her harfin kalan tahtada ayrı bir boş karşılığı vardır. Beşten az kutu kalınca görünür el küçülür; yinelenen harfler kalan aynı harflerin sayısını aşamaz. Rakip bir harfin son kutusunu doldurursa o harf elden çıkarılır, yerine yeni harf çekilmez; diğer geçerli konumlar ve el sürümü değişmez. Tahta tamamlandığında eller boşalır.
 - Harfleri sürükle veya seçip kutuya dokun. Taslağı değiştirebilir, Geri al ile temizleyebilirsin. Onayla sıfır, bir veya beş harflik hamleyi kabul eder.
-- Doğru harf kilitlenir. Yanlış harf −1 puan getirir; harf elde, kutu boş kalır. Son harfi koyan kelimenin uzunluğu kadar puan alır. İki kelime tamamlanırsa ikisi de puan getirir.
+- Doğru harf kilitlenir ve +1 puan getirir. Yanlış harf −1 puan getirir; harf elde, kutu boş kalır. Son harfi koyan ayrıca kelimenin uzunluğu kadar bonus puan alır. İki kelime tamamlanırsa ikisi de puan getirir.
 - Beş el konumunun her birinden doğru harf kullanmak +5 bonus getirir. İlerleme El bonusu sayacındadır; aynı konumu tekrar kullanmak sayacı ikinci kez ilerletmez. Bonusla sayaç sıfırlanır.
 - Onaylanan harfler teker teker gösterilir: doğru yeşil tik, yanlış kırmızı çarpı ve −1. Sonra rakip/bot harfleri sırayla uçar. Kelime ve Beşte beş kutlaması en sondadır. Gösterim sırasında yeni onay kapalıdır; hareket azaltma tercihinde uçuş gösterilmez.
-- Süre 2/3/5/10 dakikadır. Tahta dolunca veya süre bitince maç biter. En yüksek puan kazanır; eşitlik beraberliktir. Eksik cevaplar sonuçta açılır.
+- Tur süresi 15/30/45/60 saniyedir; varsayılan 30 saniye. Her oyuncu turda bir kez onaylar. Herkes onaylayınca veya süre dolunca yeni tur açılır; maç yalnızca tahta dolunca biter. Onaylanmamış taslaklar süre sonunda silinir. Yeni harfler tur sonunda gelir; doğru harf koymayanın eli aynen korunur. Tur ortasında rakip onayı diğer oyuncunun elini veya el sürümünü değiştirmez. En yüksek puan kazanır; eşitlik beraberliktir. Eksik cevaplar sonuçta açılır.
 - Aktif maçta yeni oyuncu katılmaz. Sahip ayrılırsa sıradaki gerçek oyuncu sahip olur. Son hazırlıksız oyuncu ayrıldığında kalanlar hazırsa maç başlar.
 
 Sunucu bütün taslağı önce doğrular. Rakibin doldurduğu kutu, eski tahta veya değişmiş el puan kesmeden reddedilir. Onay kimliği ve el sürümü tekrar gönderilen hamlenin ikinci kez puanlanmasını önler. HTTP'de randomUUID bulunmasa da onay anahtarı üretilebilir.
 
-## Bot, büyüteç ve performans
+## Bot, yerleşim ve performans
 
-Mola Botu yalnızca kabul edilen insan onayından sonra 1–2 doğru kutu doldurur. Yanlış/boş onay da bot sırasını başlatır; reddedilen veya tekrar gönderilmiş onay başlatmaz. Hazırlıkta ikinci insan gelirse bot kaldırılır. Aktif çok oyunculu maçta ayrılma yeni bot eklemez. Botun puanları kalıcı sıralamaya girmez.
+Mola Botu her turda kabul edilen insan onayından sonra 1–2 doğru kutu doldurur. İnsan onaylamazsa tur süresi dolduğunda bot bir kez oynar. Yanlış/boş onay da bot sırasını başlatır; reddedilen veya tekrar gönderilmiş onay başlatmaz. Hazırlıkta ikinci insan gelirse bot kaldırılır. Aktif çok oyunculu maçta ayrılma yeni bot eklemez. Botun puanları kalıcı sıralamaya girmez.
 
-Tahta, el ve Onayla ekranın kullanılabilir alanına sığar; tahtada kaydırma çubuğu yoktur. Büyüteç 5×5 kutuyu büyütür. Yakın görünüm parmakla veya fareyle her yöne sürüklenebilir; harf bırakma gerçek kutu koordinatlarına yapılır. Tüm tahta normal görünüme döner. Mobil oyuncu/ipucu listesi isteğe bağlı açılır.
+Tahta geniş ekranda yüksekliğin kullanılabilir tamamına yayılır; harfler, Onayla ve seçili ipucu sağ sütundadır. Mobilde tahta ekran genişliğine sığar, el ve Onayla hemen altındadır. Tahtanın içinde kaydırma yoktur; büyüteç kaldırılmıştır. Uzun ipucunun tamamı seçili ipucu panelinde okunur. Tüm ipuçları açılır listede tutulur.
 
 Canlı oyun CSS grid ve DOM kullanır. Üretim motoru canlı sunucuda veya tarayıcıda çalışmaz. Paket ilk yüklemede bir kez doğrulanır; oda ve rövanşta yalnızca hazırlanmış tahta kopyalanır. Bekleme odaları tick işlemez; aktif maçta süre kontrolü 250 ms, olağan durum yayını bir saniyedir. En fazla 12 gerçek oyuncu desteklenir.
 

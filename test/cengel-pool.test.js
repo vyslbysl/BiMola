@@ -45,7 +45,7 @@ test('reroll is host-only, resets readiness, rejects active games and rematches 
   const playing=room.recentBoards.at(-1),state=view(room,'a',1001);
   assert.ok(state.entries.every(e=>e.answer===undefined));assert.ok(state.cells.every(c=>c.solution===undefined && c.letter===undefined));
   assert.ok(randomize(room,'a').error);
-  tick(room,room.until);ready(room,'a',true,room.until+1);ready(room,'b',true,room.until+1);
+  room.phase='end';ready(room,'a',true,room.until+1);ready(room,'b',true,room.until+1);
   assert.equal(room.phase,'play');assert.notEqual(room.recentBoards.at(-1),playing);
   assert.equal(room.players.a.score,0);assert.equal(Object.keys(room.filled).length,0);
 });
@@ -60,4 +60,42 @@ test('automatic and manual sizes select prepared boards without live generation 
   configure(room,'a',{size:'auto'});assert.equal(room.puzzle.rows,11);
   assert.equal(adapter.commands.upload,undefined);
   assert.ok(adapter.commands.randomize);
+});
+
+test('initial and renewed hands on every bundled board contain only its actual remaining letters',()=>{
+  const pool=JSON.parse(gunzipSync(readFileSync(new URL('../server/games/cengel-kapismasi/pools/boards.json.gz',import.meta.url))));
+  let noH=0;
+  for(const board of pool.boards){
+    const r=createRoom({code:'1234',host:'a'});r.puzzle=validatePuzzle(board);
+    addPlayer(r,{id:'a',name:'Ada'});addPlayer(r,{id:'b',name:'Bora'});
+    ready(r,'a',true,1000);ready(r,'b',true,1000);
+    const assertHands=()=>{
+      for(const id of ['a','b']){
+        const remaining=r.puzzle.cells.filter(c=>!r.filled[`${c.row},${c.col}`]).map(c=>c.letter);
+        for(const letter of r.players[id].rack.filter(Boolean)){
+          const index=remaining.indexOf(letter);
+          assert.ok(index>=0,`${board.title}: ${letter} has no remaining destination`);remaining.splice(index,1);
+        }
+        assert.deepEqual(view(r,id,1100).me.rack,r.players[id].rack);
+      }
+    };
+    assertHands();
+    if(!r.puzzle.cells.some(c=>c.letter==='H')){
+      noH++;assert.ok(Object.values(r.players).every(p=>!p.rack.includes('H')));
+      const saved=r.players.a.rack;r.players.a.rack=['H',...saved.slice(1)];
+      assert.ok(!view(r,'a',1100).me.rack.includes('H'));r.players.a.rack=saved;
+    }
+    for(let turn=0;turn<3&&r.phase==='play';turn++){
+      const p=r.players.a,candidates=r.puzzle.cells.filter(c=>!r.filled[`${c.row},${c.col}`]);
+      const placements=[];
+      p.rack.forEach((letter,slot)=>{const index=candidates.findIndex(c=>c.letter===letter);if(index>=0){const [c]=candidates.splice(index,1);placements.push({row:c.row,col:c.col,slot,letter});}});
+      const a=adapter.commands.confirm.handle(r,'a',{requestId:`all-boards-${turn}`,round:r.round,revision:r.revision,handVersion:p.handVersion,placements},1100+turn*100);
+      assert.equal(a.ok,true);assertHands();
+      if(r.phase==='play'){
+        const b=adapter.commands.confirm.handle(r,'b',{requestId:`all-boards-pass-${turn}`,round:r.round,revision:r.revision,handVersion:r.players.b.handVersion,placements:[]},1150+turn*100);
+        assert.equal(b.ok,true);assertHands();
+      }
+    }
+  }
+  assert.ok(noH>0,'Include boards with no H at all, not just boards where H was used.');
 });
