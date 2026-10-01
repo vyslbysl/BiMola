@@ -268,7 +268,7 @@ test('late-game hands shrink and repeated letters never outnumber remaining dest
 });
 
 test('user AI 9x9 set validates after the unescaped clue quotation is repaired', () => {
-  const text=readFileSync(new URL('../scripts/templates/cengel-9x9.json',import.meta.url),'utf8');
+  const text=readFileSync(new URL('./fixtures/cengel-9x9.json',import.meta.url),'utf8');
   const p=validatePuzzle(text);
   assert.equal(p.rows,9); assert.equal(p.cols,9); assert.equal(p.entries.length,27);
   assert.equal(p.cells.length+p.clueCells.length+p.blankCells.length,81);
