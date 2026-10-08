@@ -1,13 +1,13 @@
 # BiMola
 
-Arkadaşlarınla tarayıcıda buluşup çok oyunculu oyunlar oynayabileceğin bir oyun lobisi. Oyunlar: **Nesne Avı** (3D saklanma oyunu, sekiz harita ve botlar), **Ateş Köprüsü** (köprüde koşulan çok oyunculu bilgi yarışması), **Çengel Kapışması** (özel harf tepsileriyle ortak bulmaca tahtası) ve **Yılan Meydanı** (çok oyunculu 3B yılan arenası).
+Arkadaşlarınla tarayıcıda buluşup çok oyunculu oyunlar oynayabileceğin bir oyun lobisi. Oyunlar: **Nesne Avı** (3D saklanma oyunu, sekiz harita ve botlar), **Ateş Köprüsü** (köprüde koşulan çok oyunculu bilgi yarışması), **Çengel Kapışması** (özel harf tepsileriyle ortak bulmaca tahtası), **Yılan Meydanı** (çok oyunculu 3B yılan arenası) ve **Kör Atış** (gizli hamlelerle geniş arenada eşzamanlı atış).
 
 ```sh
 npm ci
 npm start
 ```
 
-[Lobi](http://localhost:3000) · [Nesne Avı](http://localhost:3000/games/prop-hunt/) · [Ateş Köprüsü](http://localhost:3000/games/ates-koprusu/) · [Çengel Kapışması](http://localhost:3000/games/cengel-kapismasi/) · [Yılan Meydanı](http://localhost:3000/games/snake/)
+[Lobi](http://localhost:3000) · [Nesne Avı](http://localhost:3000/games/prop-hunt/) · [Ateş Köprüsü](http://localhost:3000/games/ates-koprusu/) · [Çengel Kapışması](http://localhost:3000/games/cengel-kapismasi/) · [Yılan Meydanı](http://localhost:3000/games/snake/) · [Kör Atış](http://localhost:3000/games/blind-shot/)
 
 Node.js 24 (Docker ile aynı sürüm) önerilir. Geliştirme: `npm run dev`. Doğrulama: `npm test`. Ek derleme adımı yok; ES modülleri kullanılır.
 
@@ -21,6 +21,8 @@ Node.js 24 (Docker ile aynı sürüm) önerilir. Geliştirme: `npm run dev`. Do�
 - `server/games/ates-koprusu/` + `public/games/ates-koprusu/`: Ateş Köprüsü kuralları, başlangıç soru seti (yalnız sunucuda), soru şeması/AI promptu ve köprü sahnesi.
 - `server/games/snake/` + `public/games/snake/`: Yılan Meydanı oyun kuralları, oda adaptörü, 3B arena ve oyun ekranı. Oda kurabilir veya dört haneli kodla katılabilirsin; ilk oyuncu oda sahibidir. Oda üst sınırı 12 oyuncu (botlar dahil), ızgara üst sınırı 128×128 ve bot üst sınırı 11’dir.
 - `server/games/cengel-kapismasi/` + `public/games/cengel-kapismasi/`: ortak çengel tahtası, özel beş harflik eller, TAC havuzundan hazırlanmış rastgele tahtalar ve 2D arayüz.
+
+- `server/games/blind-shot/` + `public/games/blind-shot/`: 1–8 kişilik, bot destekli Kör Atış; beş siperli harita (dörtgen / altıgen / sekizgen), gizli konum/nişan seçimi, eşzamanlı isabet, daralan alan, sesler, raund puanları ve ağır çekim tekrar. [Kurallar ve mimari](docs/KOR-ATIS.md).
 
 **Yeni oyun eklemek, lobiyi veya diğer oyunları değiştirmeyi gerektirmez.** Kendi istemci klasörünü ve sunucu adaptörünü ekleyip kataloğa kaydet. Çalışan iki farklı oyunla izolasyonu gösteren örnek test `test/platform.test.js` içindedir; test oyunu kullanıcı kataloğuna eklenmez.
 
