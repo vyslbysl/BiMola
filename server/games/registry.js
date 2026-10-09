@@ -39,4 +39,14 @@ export const games = [{
     namespace: '/games/cengel-kapismasi', protocolVersion: 1,
   },
   load: () => import('./cengel-kapismasi/adapter.js').then(module => module.adapter),
+}, {
+  manifest: {
+    id: 'blind-shot', name: 'Kör Atış', tagline: 'Görmeden seç. Tek atışta kal.',
+    description: 'Rakiplerin gizliyken konumunu ve atış yönünü seç. Dörtgen, altıgen ve sekizgen siperli arenalarda alan daralırken eşzamanlı atışlarla puanları topla.',
+    category: 'Strateji / Parti', minPlayers: 1, maxPlayers: 8, duration: '2–3 dk',
+    bots: true, input: 'Fare, klavye veya dokunmatik', status: 'available',
+    entry: '/games/blind-shot/', cover: '/games/blind-shot/cover.svg',
+    namespace: '/games/blind-shot', protocolVersion: 1,
+  },
+  load: () => import('./blind-shot/adapter.js').then(module => module.adapter),
 }];
