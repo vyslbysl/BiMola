@@ -6,6 +6,7 @@ import {
 } from "./inputDraft.js";
 import { createFullscreenController } from "./fullscreenMode.js";
 import { createMinimapRenderer } from "./minimap.js";
+import { getPlayerVisualIdentity } from "./visualIdentity.js";
 import {
   shouldHandleGameplayKey,
   shouldHandleManualBoostKey,
@@ -853,6 +854,8 @@ function render() {
       const stageItem = document.createElement("li");
       stageItem.textContent = `${player.name}${you}${host}: ${player.score} (rekor ${player.bestScore ?? player.score})${boosted}${shield}${shieldRecovery} ${player.isAlive ? "" : "💀"}`;
       stageItem.className = player.color;
+      stageItem.style.setProperty("--player-color", getPlayerVisualIdentity(player.color).color);
+      stageItem.classList.toggle("is-self", player.id === yourPlayerId);
       stagePlayersEl.appendChild(stageItem);
     }
   }
